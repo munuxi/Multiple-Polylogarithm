@@ -27,6 +27,7 @@ Out[2]= -2.95892601212555725906403271823074180004662930199860407
 In[3]:= numLi[{4},{10}]numLi[{3},{-5}]-(numLi[{4,3},{10,-5}]+numLi[{3,4},{-5,10}]+numLi[{7},{-50}])
 Out[3]= 0.*10^-54+0.*10^-68 I
 ```
+and Multiple Zeta Value `numMZV[{m1,...,mn}]` is simply given by `numLi[{m1,...,mn},{1,...,1}]`.
 
 The default precision of `numG` and `numLi` is 50, and one can get a higher precision by adding it manually to functions, for example,
 ```Mathematica
@@ -40,4 +41,14 @@ However, the determination of the bound of the series (according to a given prec
 
 ## Notes
 
-Mulitiple zeta values are not supported.
+It's not a very efficient realization.
+
+## Related Packages
+
+It seem that [Ginac](https://ginac.de/) (in C++) is the only software provides numerical evaluations of all known polylogarithms.
+
+[PolyLogTools](https://arxiv.org/abs/1904.07279) use Ginac as its backend to support numerical evaluations.
+
+For harmonic polylogarithms, [HPL](https://arxiv.org/abs/hep-ph/0507152) is a very useful package in Mathematica.
+
+[HyperInt](https://bitbucket.org/PanzerErik/hyperint/wiki/Home) in Maple is another well-known and powerful package in Feynman integrals calculation, but I don't know whether it can do numerical evaluations.

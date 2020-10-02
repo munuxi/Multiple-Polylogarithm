@@ -16,6 +16,14 @@ poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
 poorNG[z_List,y_,prec_:50]:=With[{hh=Chop[z]},If[AnyTrue[DeleteCases[hh,0],Abs[y/#]>1&],0,poorNG[Sequence@@(shorthand[hh]),y,prec]]]
 
 
+(* 
+myG is the general structure introduced in the section 5.3 of 0410259 :
+    myG[y1,{b1,...,br},{z1,...,zn},y2,k] = int_0^y1 ds1/(s1-b1) ... int_0^s(r-1) dsr/(sr-br) G(z1,...,z(k-1),sr,z(k+1),...,zn;y2),
+where k is the position of integral variable. For k=0, there's no integral variable, so
+    myG[y1,{b1,...,br},{z1,...,zn},y2,k] = G(b1,...,br;y1)*G(z1,...,zn;y2).
+It's clear that
+    myG[_,{},{z1,...,zn},y2,0] = G(z1,...,zn;y2).
+*)
 mylog[1]=0;
 myLi[_,0]:=0;
 (* all zero, power of log *)
@@ -34,14 +42,15 @@ myG[a_,b_,z_,y_,w_]:=(myG[a,b,z,y,w]=Expand@If[Length[z]===w===1,myG[0,{},Append
 myG[y1_,b_,z_,y2_,w_]:=(myG[y1,b,z,y2,w]=Expand@With[{tz=tailzero[z]},(myG[0,{},z[[;;w-tz]],y2,0]myG[y1,b,ConstantArray[0,tz],y2,tz])-Total[myG[y1,b,(#/.Infinity->0),y2,First[FirstPosition[#,Infinity]]]&/@Shufflep[z[[;;w-tz]],longhand[{tz},{Infinity}]]]])/;(!MatchQ[z,{0..}])&&w===Length[z]
 (* integral var in other pos *)
 myG[y1_,b_,z_,y2_,w_]:=(myG[y1,b,z,y2,w]=If[w===1,myG[y1,b,z,y2,0]+myG[y1,Append[b,y2],Delete[z,w],y2,0]+myG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-myG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0],myG[y1,b,z,y2,0]-myG[y1,Append[b,z[[w-1]]],Delete[z,w-1],y2,w-1]+myG[y1,Append[b,z[[w-1]]],Delete[z,w],y2,0]+myG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-myG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0]])/;w!=0&&w!=Length[z]
-(* goodG, assuming dG[1]=log[0]\[Rule]0 *)
+(* goodG, G functions which can be evaluated by series expansion, assuming dG[1]=log[0]\[Rule]0 *)
 goodG[z_,y_]:=goodG[z/y];
 (*goodG[z_,1]:=With[{kk=headone[z],len=Length[z]},If[len==1,dG[1],1/kk (dG[1]goodG[Rest[z],1]-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]],1],{m,kk+1,len}])]]/;First[z]===1;*)
 goodG[z_]:=With[{kk=headone[z],len=Length[z]},If[len==1,0,1/kk (-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]]],{m,kk+1,len}])]]/;First[z]===1;
 goodG[z_]:=-myLi[Length[z],1/Last[z]]/;MatchQ[Most[z],{0..}]/;Last[z]=!=0;
-(* acc G *)
+(* acc G, use Hölder convolution to accelerate convergence *)
 accG[{z_},prec_:50]:=mylog[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-myLi[2,1/(1-z1)]-myLi[2,1/z2]+myLi[2,(z1-z2)/((-1+z1) z2)];
-accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Chop[hh]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
-numG[z_,y_,prec_:50]:=If[Rationalize[First[z]/y]===1,Infinity,myG[0,{},Rationalize[z,0],Rationalize[y,0],0]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}];
+accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
+numG[z_,y_,prec_:50]:=If[Rationalize[First[z]/y,0]===1,ComplexInfinity,myG[0,{},Rationalize[z,0],Rationalize[y,0],0]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}];
 numLi[m_,x_,prec_:50]:=(-1)^Length[m]numG[longhand[m,Rest[FoldList[#1/#2&,1,x]]],1,prec]
+numMZV[m_,prec_:50]:=numLi[m,ConstantArray[1,Length[m]],prec]
