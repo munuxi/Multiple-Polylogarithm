@@ -1,14 +1,13 @@
 # Generalized-Polylogarithm
-Generalized Polylogarithm (or Goncharov Polylogarithm) in Mathematica
+Numerical Generalized Polylogarithm (or Goncharov Polylogarithm) in Mathematica
 
 ## License
 
 [The MIT License (MIT)](https://raw.githubusercontent.com/munuxi/Generalized-Polylogarithm/master/LICENSE)
 
-
 ## How to use this code
 
-A numerical realization of generalized polylogarithm (or Goncharov polylogarithm, multiple polylogarithm) in Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These functions are widely used in the calculation of Feynman integrals and amplitudes.
+A numerical realization of generalized polylogarithm (or Goncharov polylogarithm, multiple polylogarithm) in pure Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These functions are widely used in the calculation of Feynman integrals and amplitudes.
 
 This short code provides a function `numG` to numerically calculate G functions. For example, G_{1,1,1}(2,5.1212,-1,2+I) is given by
 ```Mathematica
