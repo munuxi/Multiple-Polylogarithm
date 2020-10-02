@@ -7,7 +7,7 @@ Numerical Generalized Polylogarithm (or Goncharov Polylogarithm) in Mathematica
 
 ## How to use this code
 
-A numerical realization of generalized polylogarithm (or Goncharov polylogarithm, multiple polylogarithm) in pure Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These functions are widely used in the calculation of Feynman integrals and amplitudes.
+A numerical realization of generalized polylogarithm (or Goncharov polylogarithm, multiple polylogarithm) in pure Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These polylogarithms are widely used in the calculation of Feynman integrals and amplitudes.
 
 This short code provides a function `numG` to numerically calculate G functions. For example, G_{1,1,1}(2,5.1212,-1,2+I) is given by
 ```Mathematica
@@ -44,7 +44,7 @@ It's not a very efficient realization.
 
 ## Related Packages
 
-It seem that [Ginac](https://ginac.de/) (in C++) is the only software provides numerical evaluations of all known polylogarithms.
+It seems that [Ginac](https://ginac.de/) (in C++) is the only software provides numerical evaluations of all known polylogarithms.
 
 [PolyLogTools](https://arxiv.org/abs/1904.07279) use Ginac as its backend to support numerical evaluations.
 
