@@ -1,5 +1,5 @@
-# Generalized-Polylogarithm
-Numerical Generalized Polylogarithm (or Goncharov Polylogarithm) in Mathematica
+# Multiple Polylogarithm
+Numerical Multiple Polylogarithm (or Generalized Polylogarithm, Goncharov Polylogarithm) in Mathematica
 
 ## License
 
@@ -7,9 +7,9 @@ Numerical Generalized Polylogarithm (or Goncharov Polylogarithm) in Mathematica
 
 ## How to use this code
 
-A numerical realization of generalized polylogarithm (or Goncharov polylogarithm, multiple polylogarithm) in pure Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These polylogarithms are widely used in the calculation of Feynman integrals and amplitudes.
+A numerical realization of multiple polylogarithm (or Goncharov polylogarithm, generalized polylogarithm) in pure Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These polylogarithms are widely used in the calculation of Feynman integrals and amplitudes.
 
-This short code provides a function `numG` to numerically calculate G functions. For example, G_{1,1,1}(2,5.1212,-1,2+I) is given by
+This short code provides a function `numG` to numerically calculate multiple polylogarithms. For example, G_{1,1,1}(2,5.1212,-1,2+I) is given by
 ```Mathematica
 In[1]:= numG[{2,5.1212,-1},2+I]
 Out[1]= -0.22414260773807870769808034254340050458793786499014 + 
@@ -40,7 +40,16 @@ However, the determination of the bound of the series (according to a given prec
 
 ## Notes
 
-It's not a very efficient realization.
+It's not a very efficient realization. We could calculate some examples by Ginac (via Ginsh) as a comparison. 
+
+Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh on WSL 1. They use the same CPU (i7-8700).
+
+- `numG[{1, 2, 3, 4, 5}, 6, 100]` will take ~2.5s, and Ginac will take ~1.3s
+- `numG[{5, 4, 3, 2, 1}, 6, 100]` will take ~2.5s, and Ginac will take ~64s (???)
+- `numG[{1, 2, 3, 4, 5, 6}, 7, 100]` will take ~13s, and Ginac will take ~7s 
+- `numG[{1, 2, 3, 4, 5, 6, 7}, 8, 100]` will take ~60s, and Ginac will take ~40s
+
+Usually, recursions are much faster than massive numerical evaluations of series, so it's important to speed up series evaluations in a more efficient realization.
 
 ## Related Packages
 
