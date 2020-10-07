@@ -55,6 +55,9 @@ goodG[z_]:=-myLi[Length[z],1/Last[z]]/;MatchQ[Most[z],{0..}]/;Last[z]=!=0;
 accG[{z_},prec_:50]:=mylog[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-myLi[2,1/(1-z1)]-myLi[2,1/z2]+myLi[2,(z1-z2)/((-1+z1) z2)];
 accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
-numG[z_,y_,prec_:50]:=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,myG[0,{},N[Rationalize[z/y,0],2*prec],1,0]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}],prec+10]
+numG[z_,y2_,prec_:50]:=N[Log[y2]^Length[z]/Length[z]!,prec+10]/;MatchQ[z,{0..}];
+(* remove tail zero *)
+numG[{zz___,0},y2_,prec_:50]:=N[Expand[With[{z={zz,0}},With[{kk=tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]numG[{zz},y2,prec]]-Sum[numG[Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,prec],{m,0,len-kk-1}])]]],prec+10]
+numG[z_,y_,prec_:50]:=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,myG[0,{},N[Rationalize[z/y,0],2*prec],1,0]/.goodG[x_]:>goodG[Rationalize[x,0]]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}],prec+10]/;Last[z]!=0
 numLi[m_,x_,prec_:50]:=(-1)^Length[m]numG[longhand[m,Rest[FoldList[#1/#2&,1,x]]],1,prec]
 numMZV[m_,prec_:50]:=numLi[m,ConstantArray[1,Length[m]],prec]
