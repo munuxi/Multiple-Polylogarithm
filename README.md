@@ -12,8 +12,8 @@ A numerical realization of generalized polylogarithm (or Goncharov polylogarithm
 This short code provides a function `numG` to numerically calculate G functions. For example, G_{1,1,1}(2,5.1212,-1,2+I) is given by
 ```Mathematica
 In[1]:= numG[{2,5.1212,-1},2+I]
-Out[1]= 4.43252302557497865258394344607843885003788443327544
-       +0.38186916230883509304289240286441275884630922141447 I
+Out[1]= -0.22414260773807870769808034254340050458793786499014 + 
+         0.19078434730044807965215134847688913260135197911168 I
 ```
 A related function `numLi` can be used to calculate multiple Li functions Li_{a1,...,an}(z1,...,zn), for example 
 ```Mathematica
@@ -31,10 +31,10 @@ and Multiple Zeta Value `numMZV[{m1,...,mn}]` is simply given by `numLi[{m1,...,
 The default precision of `numG` and `numLi` is 50, and one can get a higher precision by adding it manually to functions, for example,
 ```Mathematica
 In[4]:= numG[{2,5.1212,-1},2+I,100]
-Out[4]= 4.43252302557497865258394344607843885003788443327543
-          99501936807897390588056428463630338755491017776579
-       +0.38186916230883509304289240286441275884630922141446
-          96181750186091259782290786667944828021776319075942 I
+Out[4]= -0.22414260773807870769808034254340050458793786499014
+           17236003391038022863773587694654849571042358585353 + 
+         0.19078434730044807965215134847688913260135197911168
+           20844226004116650659596789737133041661049519961099 I
 ```
 However, the determination of the bound of the series (according to a given precision) is based on an empirical formula, and its correctness is not proven.
 
