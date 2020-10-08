@@ -61,3 +61,103 @@ numG[{zz___,0},y2_,prec_:50]:=N[Expand[With[{z={zz,0}},With[{kk=tailzero[z],len=
 numG[z_,y_,prec_:50]:=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,myG[0,{},N[Rationalize[z/y,0],2*prec],1,0]/.goodG[x_]:>goodG[Rationalize[x,0]]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}],prec+10]/;Last[z]!=0
 numLi[m_,x_,prec_:50]:=(-1)^Length[m]numG[longhand[m,Rest[FoldList[#1/#2&,1,x]]],1,prec]
 numMZV[m_,prec_:50]:=numLi[m,ConstantArray[1,Length[m]],prec]
+
+
+(* add the support of 1d integral of G functions, based on Newton-Leibniz formula :
+Suppose we have a function G({a1(t),...,an(t)},z), we want to rewrite it into a sum of constants and 
+G functions with the from
+    G({b1,...,bn},t),
+where bi is free of t. Then we can calcluate the 1d integral 
+    int dt/(t-b0) G({a1(t),...,an(t)},z).
+
+This reduction can be done if z-a1, ai-ai+1, an, an-z are all linear reducible in t,
+i.e. they are products of linear functions of t. The algorithm is based on Newton-Leibniz formula
+    G({a1(t),...,an(t)},z) = G({a1(0),...,an(0)},z) + int_0^t dt1 partial_t1 G({a1(t1),...,an(t1)},z)
+and (from the definition of G function)
+    dt1 partial_t1 G({a1(t1),...,an(t1)},z) = dlog(z-a1)G({a2,...,an},z)+...+
+                                              dlog(ai-ai+1)G({a1,...,\hat{ai+1},...,an},z)-
+                                              dlog(ai-ai+1)G({a1,...,\hat{ai},...,an},z)+...+
+                                              -dlog(an)G({a1,...,an-1},z),
+Finally, we reduce it to 
+    G({an},z) = log(1-z/an) = log(c) + sum_i n_i log(1-t/c_i) = log(c) + sum_i n_i G(ci,t), .... (1)
+and then we can calculate all remaining integral 
+    int dlog(t1-b1)dlog(t2-b1)...dlog(t(n-1)-b(n-1))G(ci,t) = G({b1,...,b(n-1),ci},t)
+from the definition of G function. 
+
+However, eq.(1) usually depands on the branch you choice, otherwise we can only get a funtion with
+the same symbol. The other steps are all algebraic, so if (1) is correct (on a given region),
+the whole reduction is correct (on the given region). In our realization, one could add a optional 
+function to support numerical checks of eq.(1) in the recursion, otherwise it will not check (1).
+*)
+
+(*
+TODO : Check!!!! Rename functions!!!
+*)
+
+islinearreducible[rationalfunc_, var_] := 
+ With[{hh = FactorList[rationalfunc]}, {#, If[#, hh, {}]} &[
+   NoneTrue[First /@ hh, D[#, {var, 2}] =!= 0 &]]]
+ddG[y_, z_, var_] := If[Length[y] === 1, dlog[] G[y, z],
+   -dlog[Last[y]] G[Most[y], z] + dlog[z - First[y]] G[Rest[y], z] + 
+    Sum[dlog[
+       y[[i]] - y[[i + 1]]] (G[Delete[y, i + 1], z] - 
+        G[Delete[y, i], z]), {i, 1, Length[y] - 1}]] /. 
+  dlog[x__] :> 0 /; FreeQ[{x}, var]
+initGmove[G[x_, z_], var_, numerfunc_ : Identity] := 
+ ordGmove[dlog[{}] G[x, z], var, numerfunc] /. 
+  G[{}, _] -> 1 /; FreeQ[z, var]
+ordGmove::notlinearred = "`1` is not linear reducible!";
+ordGmove[a_ + b_, var_, numerfunc_ : Identity] := 
+ ordGmove[a, var] + ordGmove[b, var]
+ordGmove[a_ c_, var_, numerfunc_ : Identity] := 
+ c ordGmove[a, var] /; FreeQ[c, G | dlog | var]
+ordGmove[dlog[list_List] G[x_, z_], var_, numerfunc_ : Identity] := 
+ If[Length[x] > 1, 
+  Expand[G[list, var] G[x /. var -> 0, z] + 
+      dlog[
+        list] (ddG[x, z, var] /. 
+           dlog[kk_] :> 
+            Total[#[[2]] dlog[#[[1]]] & /@ (If[First@#, Last@#, 
+                  Message[ordGmove::notlinearred, kk]; Abort[];] &@
+                islinearreducible[kk, var])] /. 
+          dlog[kk_] :> 0 /; FreeQ[kk, var] /. 
+         dlog[a_. var + b_.] :> dlog[var + b/a])] /. 
+    dlog[ll_List] dlog[var + kk_.] :> dlog[Append[ll, -kk]] /. 
+   dlog[kk_List] G[xx_, zz_] :> 
+    ordGmove[dlog[kk] G[xx, zz], var, numerfunc],
+  lastGmove[dlog[list] G[x, z], var, numerfunc]
+  ]
+lastGmove[a_ + b_, var_, numerfunc_ : Identity] := 
+ lastGmove[a, var, numerfunc] + lastGmove[b, var, numerfunc]
+lastGmove[a_ c_, var_, numerfunc_ : Identity] := 
+ c lastGmove[a, var, numerfunc] /; FreeQ[c, G | dlog | var]
+lastGmove[dlog[list_List] G[{x_}, z_], var_, numerfunc_ : Identity] :=
+  With[{hh = islinearreducible[1 - z/x, var]}, 
+   If[hh[[1]], (Expand[
+        dlog[list] ((If[numerfunc === Identity, 0, 
+               Rationalize[
+                 numerfunc[G[{x}, z] - #]/
+                  Pi] Pi] + #) &@(Total[#[[2]] mylog[#[[1]]] & /@ 
+                 hh[[2]]] /. 
+               mylog[aa_] :> 
+                With[{jj = CoefficientList[aa, var]}, 
+                  If[First[jj] === 0, mylog[jj[[2]]] + G[{0}, var], 
+                   mylog[jj[[1]]] + G[{-jj[[1]]/jj[[2]]}, var]]] /; ! 
+                  FreeQ[{aa}, var] //. {mylog[a_] + mylog[b_] :> 
+                mylog[Expand[a b]], 
+               mylog[a_] - mylog[b_] :> mylog[Expand[a/b]], 
+               mylog[1 - b_/a_] :> G[{a}, b]} /. 
+             mylog[a_] :> mylog[Simplify[a]]))] /. 
+       dlog[pp_List] G[qq_, var] :> G[Join[pp, qq], var] /. 
+      dlog[pp_List] :> G[pp, var]), 
+    Message[ordGmove::notlinearred, kk]; Abort[];]] /. {mylog[-1] -> 
+    I Pi, G[{}, _] :> 1}
+GIntegrate[dlog[x_] G[y_, var_], {var_, a_, b_}] := 
+ With[{hh = islinearreducible[x, var]}, 
+  If[First[hh], 
+   Expand[(Total[#[[2]] dlog[#[[1]]] & /@ Last[hh]] /. 
+         dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+        dlog[aa_. var + bb_.] :> dlog[var + bb/aa]) G[y, var]] /. 
+    dlog[var + aa_.] G[y, var] :> 
+     G[Prepend[y, -aa], b] - G[Prepend[y, -aa], a], 
+   Message[ordGmove::notlinearred, x];]]
