@@ -18,13 +18,13 @@ Out[1]= -0.22414260773807870769808034254340050458793786499014 +
 A related function `numLi` can be used to calculate multiple Li functions Li_{a1,...,an}(z1,...,zn), for example 
 ```Mathematica
 In[2]:= numLi[{4,3},{10,-5}]
-Out[2]= -2.95892601212555725906403271823074180004662930199860407
-        +22.6122376480634386402336378167074133584999533678250847235297390802388 I
+Out[2]= - 2.9589260121255572590640327182307418000466293019986040673168 + 
+         22.6122376480634386402336378167074133584999533678250847235297 I
 
 (* check an identity *)
 
 In[3]:= numLi[{4},{10}]numLi[{3},{-5}]-(numLi[{4,3},{10,-5}]+numLi[{3,4},{-5,10}]+numLi[{7},{-50}])
-Out[3]= 0.*10^-54+0.*10^-68 I
+Out[3]= 0.*10^-58 + 0.*10^-58 I
 ```
 and Multiple Zeta Value `numMZV[{m1,...,mn}]` is simply given by `numLi[{m1,...,mn},{1,...,1}]`.
 
@@ -42,14 +42,14 @@ However, the determination of the bound of the series (according to a given prec
 
 It's not a very efficient realization. We could calculate some examples by Ginac (via Ginsh) as a comparison. 
 
-Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh on WSL 1. They use the same CPU (i7-8700).
+Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh on WSL 1. They use the same CPU (i7-8700). Ginsh will take a short time on IO.
 
-- `numG[{1, 2, 3, 4, 5}, 6, 100]` will take ~2.5s, and Ginac will take ~1.3s
-- `numG[{5, 4, 3, 2, 1}, 6, 100]` will take ~2.5s, and Ginac will take ~64s (???)
-- `numG[{1, 2, 3, 4, 5, 6}, 7, 100]` will take ~13s, and Ginac will take ~7s 
-- `numG[{1, 2, 3, 4, 5, 6, 7}, 8, 100]` will take ~60s, and Ginac will take ~40s
+- `numG[{1, 2, 3, 4, 5}, 6, 100]` will take ~1.2s, and Ginac will take ~1.3s
+- `numG[{5, 4, 3, 2, 1}, 6, 100]` will take ~1.2s, and Ginac will take ~64s (???)
+- `numG[{1, 2, 3, 4, 5, 6}, 7, 100]` will take ~3.9s, and Ginac will take ~7s 
+- `numG[{1, 2, 3, 4, 5, 6, 7}, 8, 100]` will take ~10s, and Ginac will take ~40s
 
-Usually, recursions are much faster than massive numerical evaluations of series, so it's important to speed up series evaluations in a more efficient realization.
+It's possible to speed up recursions. For example, `numG[{1, 2, 3, 4, 5}, 6, 100]` and `numG[{1, 2, 3, 4, 5}, 6, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
 
 ## Related Packages
 
