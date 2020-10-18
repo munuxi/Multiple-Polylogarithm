@@ -56,20 +56,20 @@ i.e. they are products of linear functions of t. The algorithm is based on the
 Newton-Leibniz formula
 ```
   G({a1(t),...,an(t)},z) = G({a1(0),...,an(0)},z) + int_0^t dt1 partial_t1 
-                                                      G({a1(t1),...,an(t1)},z)
+                                                           G({a1(t1),...,an(t1)},z)
 ```
 and (from the definition of G function)
 ```
   dt1 partial_t1 G({a1(t1),...,an(t1)},z) 
-                            = dlog(z-a1)G({a2,...,an},z)+...+
-                              dlog(ai-ai+1)G({a1,...,\hat{ai+1},...,an},z)-
-                              dlog(ai-ai+1)G({a1,...,\hat{ai},...,an},z)+...+
-                              -dlog(an)G({a1,...,an-1},z),
+                                  = dlog(z-a1)G({a2,...,an},z)+...+
+                                    dlog(ai-ai+1)G({a1,...,\hat{ai+1},...,an},z)-
+                                    dlog(ai-ai+1)G({a1,...,\hat{ai},...,an},z)+...+
+                                    -dlog(an)G({a1,...,an-1},z),
 ```
 Finally, we reduce it to 
 ```
   G({an},z) = log(1-z/an) = log(c) + sum_i n_i log(1-t/c_i) 
-                          = log(c) + sum_i n_i G(ci,t), .................. (1)
+                          = log(c) + sum_i n_i G(ci,t), ....................... (1)
 ```
 and then we can calculate all remaining integral 
 ```
@@ -78,7 +78,7 @@ and then we can calculate all remaining integral
 from the definition of G function. 
 
 However, G({a1(0),...,an(0)},z) usually diverges when a1(0)=1 or an(0)=0, we use the 
-shuffle regularization used in [1403.3385](https://arxiv.org/abs/hep-ph/1403.3385) to get the finite result. On the other hand,
+shuffle regularization used in [1403.3385](https://arxiv.org/abs/1403.3385) to get the finite result. On the other hand,
 eq.(1) usually depands on the branch you choice, otherwise we can only get a 
 funtion with the same symbol. The other steps are all algebraic, so if (1) is correct 
 (on a given region), the whole reduction is correct (on the given region). In our 
@@ -86,7 +86,7 @@ realization, one could add fitting values to support numerical checks of eq.(1)
 in the recursion, otherwise it will not check (1).
 
 In the code, this is done by a function `movevar[Gfunc,var,FitValues]`. For example,
-```
+```Mathematica
 In[5]:= movevar[G[{t+1,t+2},3],t,{t->0.1}]
 
 Out[5]= G[{-2,-1},t]-G[{-2,2},t]+G[{1/3,2/3},1]-G[{2,-2},t]+G[{2,1},t]-
