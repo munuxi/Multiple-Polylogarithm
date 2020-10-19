@@ -46,7 +46,7 @@ myG[y1_,b_,z_,0,0]/;!MatchQ[z,{0..}]:=0
 myG[y1_,b_,z_,y_,0]/;(Last[z]=!=0):=(If[b==={},1,myG[0,{},b,y1,0]]*If[!AnyTrue[DeleteCases[z,0],Abs[#]<Abs[y]&],goodG[z/y,1],With[{pos=First@First@Position[Abs[Chop[z]],Min[Abs@DeleteCases[Chop[z],0]],1]},myG[z[[pos]],{},ReplacePart[z,pos->0],y,pos]]])
 (* remove tail zero *)
 myG[y1_,b_,{zz___,0},y2_,w_]/;(w=!=Length[{zz,0}]):=(myG[y1,b,{zz,0},y2,w]=Expand[With[{z={zz,0}},With[{kk=If[Length[z]-#<w,Length[z]-w,#]&@tailzero[z],len=Length[z]},1/kk (If[y2===1,0,mylog[y2]myG[y1,b,{zz},y2,w]]-Sum[myG[y1,b,Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,If[w!=0&&m<w,w+1,w]],{m,0,len-kk-1}])]]])
-(* special values, assuming dG[1]=log[0]\[Rule]0*)
+(* special values, assuming dG[1]=log[0]->0*)
 (* almost all zero, Li *)
 myG[y1_,b_,z_,y_,0]/;MatchQ[Most[z],{0..}]:=-If[b==={},1,myG[0,{},b,y1,0]]*myLi[Length[z],y/Last[z]];
 myG[y1_,b_,{z_},y_,0]:=If[b==={},1,goodG[b,y1]]*If[y===z,0,mylog[(-y+z)/z]];
@@ -57,7 +57,7 @@ myG[a_,b_,z_,y_,w_]/;(MatchQ[z,{0..}]&&w===Length[z]):=branchmyG[a,b,z,y,w,Sign[
 myG[y1_,b_,z_,y2_,w_]/;((!MatchQ[z,{0..}])&&w===Length[z]):=(myG[y1,b,z,y2,w]=Expand@With[{tz=tailzero[z]},(myG[0,{},z[[;;w-tz]],y2,0]myG[y1,b,ConstantArray[0,tz],y2,tz])-Total[myG[y1,b,(#/.Infinity->0),y2,First[FirstPosition[#,Infinity]]]&/@Shufflep[z[[;;w-tz]],longhand[{tz},{Infinity}]]]])
 (* integral var in other pos *)
 myG[y1_,b_,z_,y2_,w_]/;(w!=0&&w!=Length[z]):=(myG[y1,b,z,y2,w]=If[w===1,myG[y1,b,z,y2,0]+myG[y1,Append[b,y2],Delete[z,w],y2,0]+myG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-myG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0],myG[y1,b,z,y2,0]-myG[y1,Append[b,z[[w-1]]],Delete[z,w-1],y2,w-1]+myG[y1,Append[b,z[[w-1]]],Delete[z,w],y2,0]+myG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-myG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0]])
-(* goodG, G functions which can be evaluated by series expansion, assuming dG[1]=log[0]\[Rule]0 *)
+(* goodG, G functions which can be evaluated by series expansion, assuming dG[1]=log[0]->0 *)
 goodG[z_,y_]:=If[y===0,0,goodG[z/y]];
 (*goodG[z_,1]:=With[{kk=headone[z],len=Length[z]},If[len==1,dG[1],1/kk (dG[1]goodG[Rest[z],1]-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]],1],{m,kk+1,len}])]]/;First[z]===1;*)
 goodG[z_]/;(First[z]===1):=With[{kk=headone[z],len=Length[z]},If[len==1,0,1/kk (-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]]],{m,kk+1,len}])]];
@@ -66,10 +66,11 @@ goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-myLi[Length[z],1/Last[z]];
 accG[{z_},prec_:50]:=mylog[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-myLi[2,1/(1-z1)]-myLi[2,1/z2]+myLi[2,(z1-z2)/((-1+z1) z2)];
 accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
-numG[z_,y2_,prec_:50]:=N[Log[y2]^Length[z]/Length[z]!,prec+10]/;MatchQ[z,{0..}];
+numG[z_,0,prec_:50]/;(!MatchQ[z,{0..}]):=0
+numG[{0..},0,prec_:50]:=ComplexInfinity
+numG[z_,y2_,prec_:50]/;MatchQ[z,{0..}]&&(y2=!=0):=N[Log[y2]^Length[z]/Length[z]!,prec+10];
 (* remove tail zero *)
-numG[{zz___,0},y2_,prec_:50]:=N[Expand[With[{z={zz,0}},With[{kk=tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]numG[{zz},y2,prec]]-Sum[numG[Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,prec],{m,0,len-kk-1}])]]],prec+10]
-numG[z_,0,prec_:50]/;(Last[z]!=0):=0
+numG[{zz___,0},y2_,prec_:50]/;(y2=!=0):=N[Expand[With[{z={zz,0}},With[{kk=tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]numG[{zz},y2,prec]]-Sum[numG[Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,prec],{m,0,len-kk-1}])]]],prec+10]
 numG[z_,y_,prec_:50]/;(Last[z]!=0):=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,myG[0,{},Rationalize[z/y,0],1,0]/.goodG[x_]:>goodG[Rationalize[x,0]]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}],prec+10]
 numLi[m_,x_,prec_:50]:=(-1)^Length[m]numG[longhand[m,Rest[FoldList[#1/#2&,1,x]]],1,prec]
 numMZV[m_,prec_:50]:=numLi[m,ConstantArray[1,Length[m]],prec]
@@ -149,62 +150,80 @@ regwordabove[word_myword, removelist_] :=
 regword[word_myword, above_, below_] := 
   regwordbelow[word, below] /. aaa_myword :> regwordabove[aaa, above];
 
-prereginf[
+(* 
+use a special Möbius transformation z/(1+z) to convert
+G({a1,...,an},infty) to G({...},1)'s.
+*)
+
+prespecialmobiustrans[
   x_myword] := (If[# === -1, 0, myword[#/(1 + #)]] - myword[1] & /@ 
     x) //. {myword[y___, myword[p_] + q_, w___] :> 
     myword[y, p, w] + myword[y, q, w], 
    myword[y___, -myword[p_], w___] :> -myword[y, p, w]}
 
-reginf[x_myword] := 
-  regword[x, Infinity, {0}] /. myword[y__] :> prereginf[myword[y]] /. 
+specialmobiustrans[x_myword] := 
+  regword[x, Infinity, {0}] /. myword[y__] :> prespecialmobiustrans[myword[y]] /. 
    myword[yy__] :> G[Simplify /@ {yy}, 1];
 
-regGallnear0[z_] /; (Last[z] =!= {0, 0}) :=
- With[{revminpos = 
-    First@FirstPosition[Reverse[First /@ z], Min[First /@ z]]},
-  If[revminpos === 1, 
-   reginf[myword @@ (If[First[#] > 0, 0, Last[#]] & /@ 
-       Transpose[{(First /@ z - First@Last[z]), Last /@ z}])],
-   regGallnear0[z[[;; -revminpos]]] regGallnear0[
-      z[[-revminpos + 1 ;;]]] - 
-    Total[regGallnear0 /@ 
-      Shufflep[z[[;; -revminpos]], z[[-revminpos + 1 ;;]]]]
-   ]]
+(*
+We will face two kinds of divergance (t>0, t->0), 
+    G({a1 t^k1,...,an t^kn},1) and G({1-b1 t^l1,...,1-bn t^ln},1).
+They can be related by the identity 
+    G({1-c1,...,1-cn},1) = (-1)^n G({cn,...,c1},1),
+however, when 0 <= ci <= 1, one should revert the branch.
+*)
 
-regGallnear1[zz_, FitValues_ : {}] /; (First[zz] =!= {0, 0}) := 
- Module[{revertallbranchG, allposGnear0, regmyG}, 
- revertallbranchG[z_, y_] := 
-  With[{fz = If[z === {}, {}, First[First[z]]]}, 
-   Which[Variables[{z, y} //. FitValues] =!= {}, allposGnear0[z, y], 
-    MatchQ[Last /@ z, {1 ..}], allposGnear0[First /@ z, y], z === {}, 
-    1, Last@First[z] === 1, 
-    With[{hh = headone[Last /@ z]}, 
-     allposGnear0[First /@ z[[;; hh]], y] revertallbranchG[
-        z[[hh + 1 ;;]], y] - 
-      Total[revertallbranchG[#, y] & /@ 
-        Shufflep[z[[;; hh]], z[[hh + 1 ;;]]]]], Last@First[z] === -1, 
-    revertallbranchG[Prepend[Rest[z], {First@First[z], 1}], y] - 
-     If[Element[Last[fz]/Last[y] /. FitValues, 
-         Reals] && (Last[fz]/Last[y] > 
-           0 && ((First[fz] > First[y]) || (First[fz] === First[y]) &&
-              Last[fz]/Last[y] <= 1)) /. FitValues, 
-      If[First[fz] === First[y] && (Last[fz]/Last[y] /. FitValues) ===
-           1, Pi I, 2 Pi I] revertallbranchG[Rest[z], fz], 0]]];
-  allposGnear0[z_, y_] := 
-   Which[Last[y] === 0, 0, First[y] < Min[First /@ z], 
-    regmyG[{#[[1]] - First[y], #[[2]]/Last[y]} & /@ z], 
-    First[y] == Min[First /@ z],
-    With[{jj = 
-       regwordabove[
-        myword @@ (If[#[[1]] - First[y] > 0, 0, #[[2]]/Last[y]] & /@ 
-           z), {1}]},
-     jj /. myword[x__] :> G[{x}, 1]], True, 0];
-  regmyG[z_] := 
-   If[First[z] =!= {0, 1}, regGallnear0[z], 
-     regwordabove[myword @@ z, {{0, 1}}]] /. 
-    myword[x__] :> regGallnear0[{x}];
-  (-1)^(Length[zz]) revertallbranchG[{#, -1} & /@ (Reverse@zz), {0, 
-     1}]]
+(* from -ie -> +ie *)
+revertallbranchG[z_, y_, FitValues_ : {}] := Which[
+  MatchQ[Last /@ z, {1 ..}], G[First /@ z, y],
+  y === 0, 0,
+  z === {}, 1,
+  Last@First[z] === 1,
+  With[{hh = headone[Last /@ z]},
+   G[First /@ z[[;; hh]], y] revertallbranchG[z[[hh + 1 ;;]], y, 
+      FitValues]
+    - Total[
+     revertallbranchG[#, y, FitValues] & /@ 
+      Shufflep[z[[;; hh]], z[[hh + 1 ;;]]]]],
+  Last@First[z] === -1,
+  revertallbranchG[Prepend[Rest[z], {First@First[z], 1}], y, FitValues]
+   - (* if +ie -> -ie, plus here *)
+   If[Variables[{z, y} /. FitValues] === {} && 
+     Element[First@First[z] /. FitValues, Reals] && 
+     If[y === Infinity, (First@First[z] /. FitValues) >= 
+       0, ((0 <= First@First[z]/y <= 1) /. FitValues)], 
+    If[(First@First[z] /. FitValues) === 
+        0 || (First@First[z] === y /. FitValues), Pi I, 
+      2 Pi I] revertallbranchG[Rest[z], First@First[z], FitValues], 0]
+  ]
+
+preregGinf[z_] := If[z === 0, 0,
+  If[Last[z] === {0, 0}, 
+   regwordbelow[myword @@ z, {{0, 0}}] /. 
+    myword[x___] :> preregGinf[{x}], 
+   With[{revminpos = 
+      First@FirstPosition[Reverse[First /@ z], 
+        Min[First /@ DeleteCases[z, {0, 0}]]]}, 
+    If[revminpos === 1, 
+     G[((If[First[#] > 0, 0, Last[#]] & /@ 
+         Transpose[{(First /@ z - First@Last[z]), Last /@ z}])), 
+      Infinity], 
+     preregGinf[z[[;; -revminpos]]] preregGinf[
+        z[[-revminpos + 1 ;;]]] - 
+      Total[preregGinf[#] & /@ 
+        Shufflep[z[[;; -revminpos]], z[[-revminpos + 1 ;;]]]]]]]]
+
+regGinf[G[z_, Infinity]] := specialmobiustrans[myword @@ z]
+
+regGallnear0[z_] := 
+ preregGinf[z] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]
+
+regGallnear1[z_, FitValues_ : {}] :=
+ (-1)^Length[z] preregGinf[Reverse@z] /. {G[zz_, y_] :> 
+     revertallbranchG[(Table[
+          If[i =!= Length[#] && #[[i]] === 0, {#[[i]], 
+            1}, {#[[i]], -1}], {i, Length@#}] &@(zz)), y, 
+      FitValues]} /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]
 
 normGvar0[z_, var_, FitValues_ : {}] :=
  With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
@@ -234,13 +253,12 @@ normGvar0[z_, var_, FitValues_ : {}] :=
    G[z, 1] /. var -> 0,
    Limit[First[z] /. nonvarFitValues, var -> 0] === 1,
    With[{hh = headone[z /. nonvarFitValues /. var -> 0]}, 
-    With[{kk = 
-       regGallnear1[
-        Function[deg, 
-            If[deg === 0, {0, # /. var -> 0}, {deg, 
+    With[
+      {kk = regGallnear1[Function[deg, 
+            If[deg === 0, {0, 1 - # /. var -> 0}, {deg, 
               SeriesCoefficient[1 - #, {var, 0, deg}]}]][
-           minideg[1 - # /. nonvarFitValues, var], FitValues] & /@ 
-         z[[;; hh]]]}, 
+           minideg[1 - # /. nonvarFitValues, var]] & /@ z[[;; hh]], 
+        FitValues]}, 
      kk normGvar0[z[[hh + 1 ;;]], var, FitValues] - 
       Total[(normGvar0[#, var, FitValues] & /@ 
          Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]
@@ -303,6 +321,7 @@ myGmoveG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] :=
     G[{1, xx___}, 
       1] :> (regwordabove[myword[1, xx], {1}] /. 
        myword[zz__] :> G[{zz}, 1]))
+
 myGlastGmove[G[{x_}, z_], var_, FitValues_ : {}] := 
  If[FreeQ[x, var], G[{x}, z], 
    With[{hh = islinearreducible[1 - z/x, var]}, 
