@@ -355,7 +355,7 @@ movevarall[x_, var_, FitValues_ : {}] :=
            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
            ConstantArray[0, kk - 1]], y], {m, 0, 
           len - kk - 1}])]],
-     G[xx_, y_] /; (Last[xx]=!=0&&(! FreeQ[xx, var]) && ((! FreeQ[y, var]) || (! 
+     G[xx_, y_] /; (Last[xx]=!=0 && (((! FreeQ[xx, var])&&! FreeQ[y, var]) || (! 
             FreeQ[y, var] && y =!= var))) :> 
       movevar[G[xx/y, 1], var, FitValues],
       G[xx_,y_]/;MatchQ[xx,{0..}]&&!FreeQ[y,var]&&y=!=var:>
