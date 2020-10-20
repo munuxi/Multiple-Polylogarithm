@@ -342,17 +342,48 @@ myGmoveG::notlinearred = "`1` is not linear reducible!";
 
 movevar=myGmoveG;
 
+movevarall[x_, var_, FitValues_ : {}] := 
+ Expand[x /. 
+     G[_, 0] :> 
+      0 //. {G[xx_, y_] /; ((! FreeQ[xx, var]) && FreeQ[y, var]) :> 
+      movevar[G[xx, y], var, FitValues], 
+      G[z_,y_]/;!MatchQ[z,{0..}]&&Last[z]===0&&(! FreeQ[y, var])&&y=!=var:> Expand[
+    With[{kk = tailzero[z], len = Length[z]}, 
+     1/kk (G[{0},y] G[Most[z],y] - Sum[
+         G[
+          Join[z[[1 ;; m]], {0}, 
+           z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
+           ConstantArray[0, kk - 1]], y], {m, 0, 
+          len - kk - 1}])]],
+     G[xx_, y_] /; (Last[xx]=!=0&&(! FreeQ[xx, var]) && ((! FreeQ[y, var]) || (! 
+            FreeQ[y, var] && y =!= var))) :> 
+      movevar[G[xx/y, 1], var, FitValues],
+      G[xx_,y_]/;MatchQ[xx,{0..}]&&!FreeQ[y,var]&&y=!=var:>
+      (Length[xx]!)^(-1)(G[{1/(1-y)},1])^Length[xx]
+      }] /. mylog -> Log
+
+preautoGint[x_, var_, FitValues_ : {}] := 
+ FixedPoint[
+  Expand[# //. 
+     G[xx_, var] G[yy_, var] :> 
+      Total[G[#, var] & /@ Shuffle[xx, yy]]] &, 
+  movevarall[x, var, FitValues]]
+
 GIntegrate::notlinearred = "`1` is not linear reducible!";
-GIntegrate[c_ x_, {var_, a_, b_}] /; FreeQ[c, var] := 
- c GIntegrate[x, {var, a, b}]
-GIntegrate[x_ + y_, {var_, a_, b_}] := 
- GIntegrate[x, {var, a, b}] + GIntegrate[y, {var, a, b}]
-GIntegrate[dlog[x_] G[y_, var_], {var_, a_, b_}] := 
+preGIntegrate[x_, var_] /; FreeQ[x, var] := x var
+preGIntegrate[c_ x_, var_] /; FreeQ[c, var] := c preGIntegrate[x, var]
+preGIntegrate[x_ + y_, var_] := 
+ preGIntegrate[x, var] + preGIntegrate[y, var]
+preGIntegrate[dlog[x_] G[y_, var_], var_] := 
  With[{hh = islinearreducible[x, var]}, 
   If[First[hh], 
    Expand[(Total[#[[2]] dlog[#[[1]]] & /@ Last[hh]] /. 
          dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
         dlog[aa_. var + bb_.] :> dlog[var + bb/aa]) G[y, var]] /. 
     dlog[var + aa_.] G[y, var] :> 
-     G[Prepend[y, -aa], b] - G[Prepend[y, -aa], a], 
+     G[Prepend[y, -aa], var], 
    Message[GIntegrate::notlinearred, x];]]
+preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
+
+GIntegrate[x_, var_, FitValues_ : {}] := 
+ preGIntegrate[preautoGint[x, var, FitValues], var]
