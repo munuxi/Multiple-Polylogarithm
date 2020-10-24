@@ -85,19 +85,19 @@ funtion with the same symbol. The other steps are all algebraic, so if (1) is co
 realization, one could add fitting values to support numerical checks of eq.(1) 
 in the recursion, otherwise it will not check (1).
 
-In the code, this is done by a function `movevar[Gfunc,var,FitValues]`. For example,
+In the code, this is done by a function `MoveVar[Gfuncs,var,FitValues]`. For example,
 ```Mathematica
-In[5]:= movevar[G[{t+1,t+2},3],t,{t->0.1}]
+In[5]:= MoveVar[G[{a, b}, 1/t] + G[{1 - c t}, 1], t]
 
-Out[5]= G[{-2,-1},t]-G[{-2,2},t]+G[{1/3,2/3},1]-G[{2,-2},t]+G[{2,1},t]-
-        G[{-2},t] mylog[-2]+G[{2},t] mylog[-(1/2)]
+Out[5]= -I Pi+G[{0},t]-I Pi G[{0},t]+I Pi G[{1/a},t]-G[{1/c},t]+G[{0,0},t]-G[{0,1/b},t]
+        -G[{1/a,0},t]+G[{1/a,1/b},t]-G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+
+         G[{b/(1+b),1},1]-G[{0},t] Log[1/b]+G[{1/a},t] Log[1/b]+Log[c]
 
-In[6]:= movevar[G[{-t+a,t+b},3],t,{t->0.1,a->-1,b->2}]
+In[6]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t,{t->10,c->-1,a->3,b->1/5}]
 
-Out[6]= G[{-3+a,3-b},t]-G[{-3+a,-b},t]+G[{a/3,b/3},1]+G[{(a-b)/2,-3+a},t]
-       -G[{(a-b)/2,a},t]-G[{(a-b)/2,3-b},t]+G[{(a-b)/2,-b},t]-G[{-b,-3+a},t]
-       +G[{-b,a},t]+G[{(a-b)/2},t] mylog[(-3+a)/a]-G[{-b},t] mylog[(-3+a)/a]
-       +G[{-3+a},t] mylog[(-3+b)/b]-G[{(a-b)/2},t] mylog[(-3+b)/b]
+Out[6]= -I Pi+G[{0},t]+I Pi G[{0},t]-I Pi G[{1/a},t]-G[{1/c},t]+G[{0,0},t]-G[{0,1/b},t]
+        -G[{1/a,0},t]+G[{1/a,1/b},t]-G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+
+         G[{b/(1+b),1},1]-G[{0},t] Log[1/b]+G[{1/a},t] Log[1/b]+Log[c]
 ```
 `FitValues` are very important for the choice of branches. If there's no `FitValues`, 
 one can get a result, but it is usually not correct.

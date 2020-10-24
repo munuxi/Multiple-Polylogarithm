@@ -15,7 +15,7 @@ minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,If[Limit[f,var->0]===0,minide
 poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
-poorNG[z_List,y_,prec_:50]:=With[{hh=Chop[z]},If[AnyTrue[DeleteCases[hh,0],Abs[y/#]>1&],0,poorNG[Sequence@@(shorthand[hh]),y,prec]]]
+poorNG[z_List,y_,prec_:50]:=poorNG[z,y,prec]=With[{hh=Chop[z]},If[AnyTrue[DeleteCases[hh,0],Abs[y/#]>1&],0,poorNG[Sequence@@(shorthand[hh]),y,prec]]]
 (*
 (* use Levin's transformation to acc series : not so efficient *)
 levincc[j_,k_,n_]:=levincc[j,k,n]=(n+j+1)^(k-1)/(n+k+1)^(k-1)
@@ -26,52 +26,48 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 
 
 (* 
-myG is the general structure introduced in the section 5.3 of 0410259 :
-    myG[y1,{b1,...,br},{z1,...,zn},y2,k] = int_0^y1 ds1/(s1-b1) ... int_0^s(r-1) dsr/(sr-br) G(z1,...,z(k-1),sr,z(k+1),...,zn;y2),
+extendedG is the extended G function introduced in the section 5.3 of 0410259 :
+    extendedG[y1,{b1,...,br},{z1,...,zn},y2,k] = int_0^y1 ds1/(s1-b1) ... int_0^s(r-1) dsr/(sr-br) G(z1,...,z(k-1),sr,z(k+1),...,zn;y2),
 where k is the position of integral variable. For k=0, there's no integral variable, so
-    myG[y1,{b1,...,br},{z1,...,zn},y2,k] = G(b1,...,br;y1)*G(z1,...,zn;y2).
+    extendedG[y1,{b1,...,br},{z1,...,zn},y2,k] = G(b1,...,br;y1)*G(z1,...,zn;y2).
 It's clear that
-    myG[_,{},{z1,...,zn},y2,0] = G(z1,...,zn;y2).
+    extendedG[_,{},{z1,...,zn},y2,0] = G(z1,...,zn;y2).
 *)
-mylog[1,___]=0;
-mylog[x_,0]:=mylog[x];
-mylog[x_,-1]:=mylog[x]-2*Pi*I;
-mylog[x_,_]:=mylog[x];
-myLi[_,0]:=0;
+
 (* all zero, power of log *)
-myG[y1_,b_,z_,y2_,0]/;MatchQ[z,{0..}]:=If[b==={},1,myG[0,{},b,y1,0]]mylog[y2]^Length[z]/Length[z]!;
-myG[y1_,b_,{0..},0,0]:=ComplexInfinity
-myG[y1_,b_,z_,0,0]/;!MatchQ[z,{0..}]:=0
+extendedG[y1_,b_,z_,y2_,0]/;MatchQ[z,{0..}]:=If[b==={},1,extendedG[0,{},b,y1,0]]Log[y2]^Length[z]/Length[z]!;
+extendedG[y1_,b_,{0..},0,0]:=ComplexInfinity
+extendedG[y1_,b_,z_,0,0]/;!MatchQ[z,{0..}]:=0
 (* ini : be careful FirstPosition*)
-myG[y1_,b_,z_,y_,0]/;(Last[z]=!=0):=(If[b==={},1,myG[0,{},b,y1,0]]*If[!AnyTrue[DeleteCases[z,0],Abs[#]<Abs[y]&],goodG[z/y,1],With[{pos=First@First@Position[Abs[Chop[z]],Min[Abs@DeleteCases[Chop[z],0]],1]},myG[z[[pos]],{},ReplacePart[z,pos->0],y,pos]]])
+extendedG[y1_,b_,z_,y_,0]/;(Last[z]=!=0):=(If[b==={},1,extendedG[0,{},b,y1,0]]*If[!AnyTrue[DeleteCases[z,0],Abs[#]<Abs[y]&],goodG[z/y,1],With[{pos=First@First@Position[Abs[Chop[z]],Min[Abs@DeleteCases[Chop[z],0]],1]},extendedG[z[[pos]],{},ReplacePart[z,pos->0],y,pos]]])
 (* remove tail zero *)
-myG[y1_,b_,{zz___,0},y2_,w_]/;(w=!=Length[{zz,0}]):=(myG[y1,b,{zz,0},y2,w]=Expand[With[{z={zz,0}},With[{kk=If[Length[z]-#<w,Length[z]-w,#]&@tailzero[z],len=Length[z]},1/kk (If[y2===1,0,mylog[y2]myG[y1,b,{zz},y2,w]]-Sum[myG[y1,b,Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,If[w!=0&&m<w,w+1,w]],{m,0,len-kk-1}])]]])
+extendedG[y1_,b_,{zz___,0},y2_,w_]/;(w=!=Length[{zz,0}]):=(extendedG[y1,b,{zz,0},y2,w]=Expand[With[{z={zz,0}},With[{kk=If[Length[z]-#<w,Length[z]-w,#]&@tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]extendedG[y1,b,{zz},y2,w]]-Sum[extendedG[y1,b,Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,If[w!=0&&m<w,w+1,w]],{m,0,len-kk-1}])]]])
 (* special values, assuming dG[1]=log[0]->0*)
 (* almost all zero, Li *)
-myG[y1_,b_,z_,y_,0]/;MatchQ[Most[z],{0..}]:=-If[b==={},1,myG[0,{},b,y1,0]]*myLi[Length[z],y/Last[z]];
-myG[y1_,b_,{z_},y_,0]:=If[b==={},1,goodG[b,y1]]*If[y===z,0,mylog[(-y+z)/z]];
-myG[y1_,b_,{z1_,z2_},y_,0]/;(z2=!=0):=If[z1===y,-myG[y1,b,{z2,z1},y,0],If[b=={},1,goodG[b,y1]]*(-myLi[2,y/(y-z1)]-myLi[2,y/z2]+myLi[2,y (z1-z2)/((-y+z1) z2)])]
+extendedG[y1_,b_,z_,y_,0]/;MatchQ[Most[z],{0..}]:=-If[b==={},1,extendedG[0,{},b,y1,0]]*PolyLog[Length[z],y/Last[z]];
+extendedG[y1_,b_,{z_},y_,0]:=If[b==={},1,goodG[b,y1]]*If[y===z,0,Log[(-y+z)/z]];
+extendedG[y1_,b_,{z1_,z2_},y_,0]/;(z2=!=0):=If[z1===y,-extendedG[y1,b,{z2,z1},y,0],If[b=={},1,goodG[b,y1]]*(-PolyLog[2,y/(y-z1)]-PolyLog[2,y/z2]+PolyLog[2,y (z1-z2)/((-y+z1) z2)])]
 (* tail integral var *)
-branchmyG[a_,b_,z_,y_,w_,branch_]/;(MatchQ[z,{0..}]&&w===Length[z]):=branchmyG[a,b,z,y,w,branch]=Expand@If[Length[z]===w===1,branchmyG[0,{},Append[b,y],a,0,branch]+mylog[-y,branch]If[b=={},1,branchmyG[0,{},b,a,0,branch]]-branchmyG[0,{},Append[b,0],a,0,branch],If[b=={},1,branchmyG[0,{},b,a,0,branch]](-myzeta[w]+branchmyG[y,{0},ConstantArray[0,w-1],y,w-1,branch])-branchmyG[a,Append[b,0],ConstantArray[0,w-1],y,w-1,branch]]
-myG[a_,b_,z_,y_,w_]/;(MatchQ[z,{0..}]&&w===Length[z]):=branchmyG[a,b,z,y,w,Sign[Im[a]]]/.branchmyG[p__,q_]:>myG[p]
-myG[y1_,b_,z_,y2_,w_]/;((!MatchQ[z,{0..}])&&w===Length[z]):=(myG[y1,b,z,y2,w]=Expand@With[{tz=tailzero[z]},(myG[0,{},z[[;;w-tz]],y2,0]myG[y1,b,ConstantArray[0,tz],y2,tz])-Total[myG[y1,b,(#/.Infinity->0),y2,First[FirstPosition[#,Infinity]]]&/@Shufflep[z[[;;w-tz]],longhand[{tz},{Infinity}]]]])
+branchextendedG[a_,b_,z_,y_,w_,branch_]/;(MatchQ[z,{0..}]&&w===Length[z]):=branchextendedG[a,b,z,y,w,branch]=Expand@If[Length[z]===w===1,branchextendedG[0,{},Append[b,y],a,0,branch]+If[branch===-1,Log[-y]-2*Pi*I,Log[-y]] If[b=={},1,branchextendedG[0,{},b,a,0,branch]]-branchextendedG[0,{},Append[b,0],a,0,branch],If[b=={},1,branchextendedG[0,{},b,a,0,branch]](-Zeta[w]+branchextendedG[y,{0},ConstantArray[0,w-1],y,w-1,branch])-branchextendedG[a,Append[b,0],ConstantArray[0,w-1],y,w-1,branch]]
+extendedG[a_,b_,z_,y_,w_]/;(MatchQ[z,{0..}]&&w===Length[z]):=branchextendedG[a,b,z,y,w,Sign[Im[a]]]/.branchextendedG[p__,q_]:>extendedG[p]
+extendedG[y1_,b_,z_,y2_,w_]/;((!MatchQ[z,{0..}])&&w===Length[z]):=(extendedG[y1,b,z,y2,w]=Expand@With[{tz=tailzero[z]},(extendedG[0,{},z[[;;w-tz]],y2,0]extendedG[y1,b,ConstantArray[0,tz],y2,tz])-Total[extendedG[y1,b,(#/.Infinity->0),y2,First[FirstPosition[#,Infinity]]]&/@Shufflep[z[[;;w-tz]],longhand[{tz},{Infinity}]]]])
 (* integral var in other pos *)
-myG[y1_,b_,z_,y2_,w_]/;(w!=0&&w!=Length[z]):=(myG[y1,b,z,y2,w]=If[w===1,myG[y1,b,z,y2,0]+myG[y1,Append[b,y2],Delete[z,w],y2,0]+myG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-myG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0],myG[y1,b,z,y2,0]-myG[y1,Append[b,z[[w-1]]],Delete[z,w-1],y2,w-1]+myG[y1,Append[b,z[[w-1]]],Delete[z,w],y2,0]+myG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-myG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0]])
+extendedG[y1_,b_,z_,y2_,w_]/;(w!=0&&w!=Length[z]):=(extendedG[y1,b,z,y2,w]=If[w===1,extendedG[y1,b,z,y2,0]+extendedG[y1,Append[b,y2],Delete[z,w],y2,0]+extendedG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-extendedG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0],extendedG[y1,b,z,y2,0]-extendedG[y1,Append[b,z[[w-1]]],Delete[z,w-1],y2,w-1]+extendedG[y1,Append[b,z[[w-1]]],Delete[z,w],y2,0]+extendedG[y1,Append[b,z[[w+1]]],Delete[z,w+1],y2,w]-extendedG[y1,Append[b,z[[w+1]]],Delete[z,w],y2,0]])
 (* goodG, G functions which can be evaluated by series expansion, assuming dG[1]=log[0]->0 *)
 goodG[z_,y_]:=If[y===0,0,goodG[z/y]];
 (*goodG[z_,1]:=With[{kk=headone[z],len=Length[z]},If[len==1,dG[1],1/kk (dG[1]goodG[Rest[z],1]-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]],1],{m,kk+1,len}])]]/;First[z]===1;*)
 goodG[z_]/;(First[z]===1):=With[{kk=headone[z],len=Length[z]},If[len==1,0,1/kk (-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]]],{m,kk+1,len}])]];
-goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-myLi[Length[z],1/Last[z]];
+goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-PolyLog[Length[z],1/Last[z]];
 (* acc G, use Hölder convolution to accelerate convergence *)
-accG[{z_},prec_:50]:=mylog[(-1+z)/z];
-accG[{z1_,z2_},prec_:50]:=-myLi[2,1/(1-z1)]-myLi[2,1/z2]+myLi[2,(z1-z2)/((-1+z1) z2)];
+accG[{z_},prec_:50]:=Log[(-1+z)/z];
+accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
 accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
 numG[z_,0,prec_:50]/;(!MatchQ[z,{0..}]):=0
 numG[{0..},0,prec_:50]:=ComplexInfinity
 numG[z_,y2_,prec_:50]/;MatchQ[z,{0..}]&&(y2=!=0):=N[Log[y2]^Length[z]/Length[z]!,prec+10];
 (* remove tail zero *)
 numG[{zz___,0},y2_,prec_:50]/;(y2=!=0):=N[Expand[With[{z={zz,0}},With[{kk=tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]numG[{zz},y2,prec]]-Sum[numG[Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,prec],{m,0,len-kk-1}])]]],prec+10]
-numG[z_,y_,prec_:50]/;(Last[z]!=0):=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,myG[0,{},Rationalize[z/y,0],1,0]/.goodG[x_]:>goodG[Rationalize[x,0]]//.{goodG[x_]:>accG[x,prec],myLi->PolyLog,mylog->Log,myzeta->Zeta}],prec+10]
+numG[z_,y_,prec_:50]/;(Last[z]!=0):=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,extendedG[0,{},Rationalize[z/y,0],1,0]/.goodG[x_]:>goodG[Rationalize[x,0]]//.{goodG[x_]:>accG[x,prec]}],prec+10]
 numLi[m_,x_,prec_:50]:=(-1)^Length[m]numG[longhand[m,Rest[FoldList[#1/#2&,1,x]]],1,prec]
 numMZV[m_,prec_:50]:=numLi[m,ConstantArray[1,Length[m]],prec]
 
@@ -170,32 +166,13 @@ We will face two kinds of divergance (t>0, t->0),
     G({a1 t^k1,...,an t^kn},1) and G({1-b1 t^l1,...,1-bn t^ln},1).
 They can be related by the identity 
     G({1-c1,...,1-cn},1) = (-1)^n G({cn,...,c1},1),
-however, when 0 <= ci <= 1, one should revert the branch.
+however, when 0 <= ci <= 1, one should reverse the branch. 
+Here, we can calculate the result G({cn,...,c1},1) first and then
+set all G({d1,...,dk},1) \[Rule] (-1)^k G({1-dk,...,1-d1},1) in the
+result. The Möbius transformation  z/(1+z) used in the calculation 
+of G({cn,...,c1},1) takes a + I e to a/(1+a) + I e/(1+a)^2, 
+which keeps the branch.
 *)
-
-(* from -ie -> +ie *)
-revertallbranchG[z_, y_, FitValues_ : {}] := Which[
-  MatchQ[Last /@ z, {1 ..}], G[First /@ z, y],
-  y === 0, 0,
-  z === {}, 1,
-  Last@First[z] === 1,
-  With[{hh = headone[Last /@ z]},
-   G[First /@ z[[;; hh]], y] revertallbranchG[z[[hh + 1 ;;]], y, 
-      FitValues]
-    - Total[
-     revertallbranchG[#, y, FitValues] & /@ 
-      Shufflep[z[[;; hh]], z[[hh + 1 ;;]]]]],
-  Last@First[z] === -1,
-  revertallbranchG[Prepend[Rest[z], {First@First[z], 1}], y, FitValues]
-   - (* if +ie -> -ie, plus here *)
-   If[Variables[{z, y} /. FitValues] === {} && 
-     Element[First@First[z] /. FitValues, Reals] && 
-     If[y === Infinity, (First@First[z] /. FitValues) >= 
-       0, ((0 <= First@First[z]/y <= 1) /. FitValues)], 
-    If[(First@First[z] /. FitValues) === 
-        0 || (First@First[z] === y /. FitValues), Pi I, 
-      2 Pi I] revertallbranchG[Rest[z], First@First[z], FitValues], 0]
-  ]
 
 preregGinf[z_] := If[z === 0, 0,
   If[Last[z] === {0, 0}, 
@@ -218,12 +195,10 @@ regGinf[G[z_, Infinity]] := specialmobiustrans[myword @@ z]
 regGallnear0[z_] := 
  preregGinf[z] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]
 
-regGallnear1[z_, FitValues_ : {}] :=
- (-1)^Length[z] preregGinf[Reverse@z] /. {G[zz_, y_] :> 
-     revertallbranchG[(Table[
-          If[i =!= Length[#] && #[[i]] === 0, {#[[i]], 
-            1}, {#[[i]], -1}], {i, Length@#}] &@(zz)), y, 
-      FitValues]} /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]
+regGallnear1[z_] :=
+  (-1)^Length[z] preregGinf[Reverse@z] /. 
+   G[zz_, Infinity] :> regGinf[G[zz, Infinity]] /. 
+  G[zz_, 1] :> (-1)^Length[zz] G[Reverse[1 - zz], 1]
 
 normGvar0[z_, var_, FitValues_ : {}] :=
  With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
@@ -257,8 +232,7 @@ normGvar0[z_, var_, FitValues_ : {}] :=
       {kk = regGallnear1[Function[deg, 
             If[deg === 0, {0, 1 - # /. var -> 0}, {deg, 
               SeriesCoefficient[1 - #, {var, 0, deg}]}]][
-           minideg[1 - # /. nonvarFitValues, var]] & /@ z[[;; hh]], 
-        FitValues]}, 
+           minideg[1 - # /. nonvarFitValues, var]] & /@ z[[;; hh]]]}, 
      kk normGvar0[z[[hh + 1 ;;]], var, FitValues] - 
       Total[(normGvar0[#, var, FitValues] & /@ 
          Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]
@@ -278,6 +252,11 @@ normGvar0[z_, var_, FitValues_ : {}] :=
    ]]
 
 (* Newton-Leibniz reduction *)
+
+mylog[1] = 0;
+mylog[-1] = Pi I;
+mylogToG[exp_] := exp /. mylog[x_] :> G[{1/(1 - x)}, 1];
+PolyLogToG[exp_] :=  mylogToG[exp] /. PolyLog[k_,x_] :> - G[Append[ConstantArray[0,k-1],1],x];
 
 islinearreducible[rationalfunc_, var_] := 
  With[{hh = 
@@ -301,28 +280,57 @@ ddG[y_, z_, var_] := If[Length[y] === 1, dlog[] G[y, z],
         G[Delete[y, i], z]), {i, 1, Length[y] - 1}]] /. 
   dlog[x__] :> 0 /; FreeQ[{x}, var]
 
-myGmoveG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
- myGmoveG[G[x, z], var, 
-   FitValues] = (Expand[
+(* the following may be wrong, but some snippets there are useful:
+decomposeheadsame[z_, y_, a_, func1_, func2_] := 
+ Expand[If[First[z] =!= a, func1[G[z, y]], 
+   With[{kk = readfirstnotinpos[z, {a}, 1], len = Length[z]}, 
+    If[len == 1, func1[G[{a}, y]], 
+     1/kk! func1[G[{a}, y]]^
+       kk If[Length[z] === kk, 1, func2[G[z[[kk + 1 ;;]], y]]] - 
+      1/kk Sum[
+        decomposeheadsame[
+         Join[ConstantArray[a, kk - 1], z[[kk + 1 ;; m]], {a}, 
+          z[[m + 1 ;;]]], y, a, func1, func2], {m, kk + 1, len}]]]]]
+          
+AnalCont[G[z_, var_], var_, FitValues_ : {}] := 
+ Which[FitValues === {}, G[z, var],
+  Element[(First[z]/var /. FitValues), Reals] && 
+   0 <= (First[z]/var /. FitValues) <= 1,
+  If[readfirstnotinpos[z, {First[z]}, 1] === 1,
+   G[z, var] + I Pi If[Length[z] === 1, 1, G[Rest[z], var]],
+   decomposeheadsame[z, var, First[z], AnalCont[#, var, FitValues] &, 
+    AnalCont[#, var, FitValues] &
+    ]],
+  True,
+  G[z, var]
+  ]
+*)
+
+MoveVarofG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
+ MoveVarofG[G[x, z], var, 
+   FitValues]= Expand[Expand[
      Which[FreeQ[{x, z}, var], G[x, z], Length[x] === 1, 
-      myGlastGmove[G[x, z], var, FitValues], Length[x] > 1, 
+      tailmove[G[x, z], var, FitValues], Length[x] > 1, 
       normGvar0[x/z, var, FitValues] + 
          Expand[ddG[x, z, var] /. 
               dlog[kk_] :> 
                Total[(#1[[2]] dlog[#1[[1]]] &) /@ (If[First[#1], 
-                    Last[#1], Message[myGmoveG::notlinearred, kk];
+                    Last[#1], Message[MoveVarofG::notlinearred, kk];
                     Abort[];] &)[islinearreducible[kk, var]]] /. 
              dlog[kk_] :> 0 /; FreeQ[kk, var] /. 
             dlog[xx_] /; ! FreeQ[xx, var] :> 
              dlog[var + (xx /. var -> 0)/D[xx, var]] /. 
-           G[xx__] :> myGmoveG[G[xx], var, FitValues]] //. 
+           G[xx__] :> MoveVarofG[G[xx], var, FitValues]] //. 
         dlog[var + aa_.] G[xx_, var] :> G[Prepend[xx, -aa], var] //. 
        dlog[var + aa_.] :> G[{-aa}, var]]] /. 
-    G[{1, xx___}, 
-      1] :> (regwordabove[myword[1, xx], {1}] /. 
-       myword[zz__] :> G[{zz}, 1]))
+    G[{1, xx___}, 1] :> (regwordabove[myword[1, xx], {1}] /. 
+    myword[zz__] :> G[{zz}, 1])]
 
-myGlastGmove[G[{x_}, z_], var_, FitValues_ : {}] := 
+(* here we use var = 10^-80 to fit branch, it's usually enough, 
+but it will lead some errors. *)
+
+tailmove[G[{x_}, z_], var_, FitValues_ : {}] := 
+ With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
  If[FreeQ[x, var], G[{x}, z], 
    With[{hh = islinearreducible[1 - z/x, var]}, 
     If[hh[[1]], 
@@ -331,22 +339,21 @@ myGlastGmove[G[{x_}, z_], var_, FitValues_ : {}] :=
            var] //. {mylog[aa_ + bb_. var] :> 
             G[{-(aa/bb)}, var] + mylog[aa], 
            mylog[var] -> G[{0}, var]}]}, 
-      If[Variables[z/x //. FitValues] =!= {}, jj, 
+      If[Variables[z/x /.nonvarFitValues/.var->10^-80] =!= {}, jj, 
          jj - Rationalize[
           N[(jj - Log[1 - z/x])/(Pi I) //. {G[{0}, yy_] :> Log[yy],
                G[{aa_}, yy_] /; aa =!= 0 :> Log[1 - yy/aa], 
-              mylog -> Log} //. Rationalize[FitValues, 0], 1000], 
-          0] (Pi I)]], Message[myGmoveG::notlinearred, 1 - z/x]; 
-     Abort[];]]] /. {G[{}, _] :> 1, mylog[-1] -> Pi I}
-myGmoveG::notlinearred = "`1` is not linear reducible!";
+              mylog -> Log} //. Rationalize[Append[nonvarFitValues,var->10^-80], 0], 1000], 
+          0] (Pi I)]], Message[MoveVarofG::notlinearred, 1 - z/x]; 
+     Abort[];]]] /. {G[{}, _] :> 1}]
 
-movevar=myGmoveG;
+MoveVarofG::notlinearred = "`1` is not linear reducible!";
 
-movevarall[x_, var_, FitValues_ : {}] := 
+MoveVar[x_, var_, FitValues_ : {}] := 
  Expand[x /. 
      G[_, 0] :> 
       0 //. {G[xx_, y_] /; ((! FreeQ[xx, var]) && FreeQ[y, var]) :> 
-      movevar[G[xx, y], var, FitValues], 
+      MoveVarofG[G[xx, y], var, FitValues], 
       G[z_,y_]/;!MatchQ[z,{0..}]&&Last[z]===0&&(! FreeQ[y, var])&&y=!=var:> Expand[
     With[{kk = tailzero[z], len = Length[z]}, 
      1/kk (G[{0},y] G[Most[z],y] - Sum[
@@ -357,7 +364,7 @@ movevarall[x_, var_, FitValues_ : {}] :=
           len - kk - 1}])]],
      G[xx_, y_] /; (Last[xx]=!=0 && (((! FreeQ[xx, var])&&! FreeQ[y, var]) || (! 
             FreeQ[y, var] && y =!= var))) :> 
-      movevar[G[xx/y, 1], var, FitValues],
+      MoveVarofG[G[xx/y, 1], var, FitValues],
       G[xx_,y_]/;MatchQ[xx,{0..}]&&!FreeQ[y,var]&&y=!=var:>
       (Length[xx]!)^(-1)(G[{1/(1-y)},1])^Length[xx]
       }] /. mylog -> Log
@@ -367,7 +374,7 @@ preautoGint[x_, var_, FitValues_ : {}] :=
   Expand[# //. 
      G[xx_, var] G[yy_, var] :> 
       Total[G[#, var] & /@ Shuffle[xx, yy]]] &, 
-  movevarall[x, var, FitValues]]
+  MoveVar[x, var, FitValues]]
 
 GIntegrate::notlinearred = "`1` is not linear reducible!";
 preGIntegrate[x_, var_] /; FreeQ[x, var] := x var
@@ -380,8 +387,7 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
    Expand[(Total[#[[2]] dlog[#[[1]]] & /@ Last[hh]] /. 
          dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
         dlog[aa_. var + bb_.] :> dlog[var + bb/aa]) G[y, var]] /. 
-    dlog[var + aa_.] G[y, var] :> 
-     G[Prepend[y, -aa], var], 
+    dlog[var + aa_.] G[y, var] :> G[Prepend[y, -aa], var], 
    Message[GIntegrate::notlinearred, x];]]
 preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
 
