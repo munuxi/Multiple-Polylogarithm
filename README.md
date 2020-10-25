@@ -85,22 +85,39 @@ funtion with the same symbol. The other steps are all algebraic, so if (1) is co
 realization, one could add fitting values to support numerical checks of eq.(1) 
 in the recursion, otherwise it will not check (1).
 
-In the code, this is done by a function `MoveVar[Gfuncs,var,FitValues]`. For example,
+In the code, this is done by a function `MoveVar[Gfuncs,var,FitValues]`. 
+`FitValues` are very important for the choice of branches. If there's no `FitValues`, 
+one can get a result, but it is usually not correct. For example,
 ```Mathematica
-In[5]:= MoveVar[G[{a, b}, 1/t] + G[{1 - c t}, 1], t]
+(* an example with and without FitValues *)
 
-Out[5]= -I Pi+G[{0},t]-I Pi G[{0},t]+I Pi G[{1/a},t]-G[{1/c},t]+G[{0,0},t]-G[{0,1/b},t]
-        -G[{1/a,0},t]+G[{1/a,1/b},t]-G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+
-         G[{b/(1+b),1},1]-G[{0},t] Log[1/b]+G[{1/a},t] Log[1/b]+Log[c]
+In[5]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t]
+
+Out[5]= -I Pi+G[{0},t]-I Pi G[{0},t]+1/2 G[{0},t]^2+I Pi G[{1/a},t]-G[{0},t] G[{1/a},t]
+        -G[{0},t] G[{1/b},t]+G[{1/a},t] G[{1/b},t]-G[{1/c},t]+G[{0,1/a},t]
+        -G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+G[{1/b,0},t]-G[{1/b,1/a},t]
+        +G[{b/(1+b),1},1]-G[{0},t] Log[1/b]+G[{1/a},t] Log[1/b]+Log[c]
 
 In[6]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t,{t->10,c->-1,a->3,b->1/5}]
 
-Out[6]= -I Pi+G[{0},t]+I Pi G[{0},t]-I Pi G[{1/a},t]-G[{1/c},t]+G[{0,0},t]-G[{0,1/b},t]
-        -G[{1/a,0},t]+G[{1/a,1/b},t]-G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+
-         G[{b/(1+b),1},1]-G[{0},t] Log[1/b]+G[{1/a},t] Log[1/b]+Log[c]
+Out[6]= -I Pi +2 I Pi  G[{0},1/a]-2 I Pi  G[{0},1/b]+G[{0},t]-I Pi  G[{0},t]
+        +1/2 G[{0},t]^2+2 I Pi  G[{1/a},1/b]-G[{0},t] G[{1/a},t]+I Pi (-2 I Pi +G[{1/a},t])
+        +2 I Pi  G[{1/a-1/b},1/a]-G[{0},t] (-2 I Pi +G[{1/b},t])
+        +G[{1/a},t] (-2 I Pi +G[{1/b},t])-G[{1/c},t]+G[{0,1/a},t]-G[{a/(1+a),1},1]
+        +G[{a/(1+a),b/(1+b)},1]+G[{1/b,0},t]-G[{1/b,1/a},t]+G[{b/(1+b),1},1]
+        -G[{0},t] Log[1/b]+(-2 I Pi +G[{1/a},t]) Log[1/b]+Log[c]
+
+(* check *)
+
+In[7]:= (%5 - (G[{a,b},1/t]+G[{1-c t}))/.{t->10,c->-1,a->3,b->1/5}]/.G->numG
+
+Out[7]= -19.7392088021787172376689819997523022706273988144815812528267 + 
+         16.802171503290900150206155902228343811048017874930332000610 I
+
+In[8]:= (%6 - (G[{a,b},1/t]+G[{1-c t}))/.{t->10,c->-1,a->3,b->1/5}]/.G->numG
+
+Out[8]= 0.*10^-58 + 0.*10^-58 I
 ```
-`FitValues` are very important for the choice of branches. If there's no `FitValues`, 
-one can get a result, but it is usually not correct.
 
 
 
@@ -116,8 +133,7 @@ Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh o
 - `numG[{1, 2, 3, 4, 5, 6, 7}, 8, 100]` will take ~10s, and Ginac will take ~40s
 
 It's much slower when there're non-rational numbers, but Ginac doesn't care it. It's really important to speed up the sum of lots of float numbers for the series calculation.
-
-It's possible to speed up recursions. For example, `numG[{1, 2, 3, 4, 5}, 6, 100]` and `numG[{1, 2, 3, 4, 5}, 6, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
+It's also possible to speed up recursions. For example, `numG[{1, 2, 3, 4, 5}, 6, 100]` and `numG[{1, 2, 3, 4, 5}, 6, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
 
 ## Related Packages
 

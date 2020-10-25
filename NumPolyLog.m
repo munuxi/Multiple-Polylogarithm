@@ -168,7 +168,7 @@ They can be related by the identity
     G({1-c1,...,1-cn},1) = (-1)^n G({cn,...,c1},1),
 however, when 0 <= ci <= 1, one should reverse the branch. 
 Here, we can calculate the result G({cn,...,c1},1) first and then
-set all G({d1,...,dk},1) \[Rule] (-1)^k G({1-dk,...,1-d1},1) in the
+set all G({d1,...,dk},1) -> (-1)^k G({1-dk,...,1-d1},1) in the
 result. The Möbius transformation  z/(1+z) used in the calculation 
 of G({cn,...,c1},1) takes a + I e to a/(1+a) + I e/(1+a)^2, 
 which keeps the branch.
@@ -280,51 +280,85 @@ ddG[y_, z_, var_] := If[Length[y] === 1, dlog[] G[y, z],
         G[Delete[y, i], z]), {i, 1, Length[y] - 1}]] /. 
   dlog[x__] :> 0 /; FreeQ[{x}, var]
 
-(* the following may be wrong, but some snippets there are useful:
 decomposeheadsame[z_, y_, a_, func1_, func2_] := 
- Expand[If[First[z] =!= a, func1[G[z, y]], 
+ Expand[If[First[z] =!= a || readfirstnotinpos[z, {a}, 1] === 1, 
+   func1[z, y], 
    With[{kk = readfirstnotinpos[z, {a}, 1], len = Length[z]}, 
-    If[len == 1, func1[G[{a}, y]], 
-     1/kk! func1[G[{a}, y]]^
-       kk If[Length[z] === kk, 1, func2[G[z[[kk + 1 ;;]], y]]] - 
-      1/kk Sum[
-        decomposeheadsame[
-         Join[ConstantArray[a, kk - 1], z[[kk + 1 ;; m]], {a}, 
-          z[[m + 1 ;;]]], y, a, func1, func2], {m, kk + 1, len}]]]]]
-          
-AnalCont[G[z_, var_], var_, FitValues_ : {}] := 
- Which[FitValues === {}, G[z, var],
-  Element[(First[z]/var /. FitValues), Reals] && 
-   0 <= (First[z]/var /. FitValues) <= 1,
-  If[readfirstnotinpos[z, {First[z]}, 1] === 1,
-   G[z, var] + I Pi If[Length[z] === 1, 1, G[Rest[z], var]],
-   decomposeheadsame[z, var, First[z], AnalCont[#, var, FitValues] &, 
-    AnalCont[#, var, FitValues] &
-    ]],
+    If[len == 1, func1[{a}, y], 
+     1/kk ( func1[{a}, y] decomposeheadsame[z[[2 ;;]], y, a, func1, 
+          func2] - 
+        Sum[decomposeheadsame[
+          Join[ConstantArray[a, kk - 1], z[[kk + 1 ;; m]], {a}, 
+           z[[m + 1 ;;]]], y, a, func1, func2], {m, kk + 1, len}])]]]]
+
+removetail[z_, y_, a_, func1_, func2_] := 
+ Expand[If[Last[z] =!= a, func1[z, y], 
+   With[{kk = readfirstnotinpos[z, {a}, -1], len = Length[z]}, 
+    If[len == 1, func1[{a}, y], 
+     1/kk ( func1[{a}, y] removetail[z[[;; -2]], y, a, func1, 
+          func2] - 
+        Sum[removetail[
+          Join[z[[;; m]], {a}, z[[m + 1 ;; -kk - 1]], 
+           ConstantArray[a, kk - 1]], y, a, func1, func2], {m, 0, 
+          len - kk - 1}])]]]]
+
+(* -ie -> +ie *)
+revertallbranchG[z_, y_, var_, FitValues_ : {}] :=
+revertallbranchG[z, y, var, FitValues] =
+ Which[
+  y === 0, 0,
+  z === {}, 1,
+  MatchQ[Last /@ z, {1 ..}], G[First /@ z, y],
+  FreeQ[y, var] && MatchQ[Last /@ z, {-1 ..}] && First@Last[z] === 0,
+  removetail[z, y, Last[z], G[First /@ #1, #2] &,
+   (-1)^Length[#1] G[#2 - Reverse[(First /@ #1)], #2] &],
+  FreeQ[y, var] && MatchQ[Last /@ z, {-1 ..}] && First@Last[z] =!= 0,
+  (-1)^Length[z] G[y - Reverse[(First /@ z)], y],
+  Last@First[z] === 1,
+  With[{hh = headone[Last /@ z]}, 
+   G[First /@ z[[;; hh]], y] revertallbranchG[z[[hh + 1 ;;]], y, var, 
+      FitValues] - 
+    Total[revertallbranchG[#, y, var, FitValues] & /@ 
+      Shufflep[z[[;; hh]], z[[hh + 1 ;;]]]]],
+  Last@First[z] === -1 && readfirstnotinpos[z, {First[z]}, 1] > 1, 
+  decomposeheadsame[z, y, First[z], 
+   revertallbranchG[#1, #2, var, FitValues] &, 
+   revertallbranchG[#1, #2, var, FitValues] &],
+  Last@First[z] === -1 && readfirstnotinpos[z, {First[z]}, 1] === 1,
+  revertallbranchG[Prepend[Rest[z], {First@First[z], 1}], y, var, 
+    FitValues]
+   - (* if +ie -> -ie, plus here *)
+   If[Variables[{z, y} /. FitValues] === {} && 
+     Element[First@First[z] /. FitValues, Reals] && 
+     If[y === Infinity, (First@First[z] /. FitValues) >= 
+       0, ((0 <= First@First[z]/y <= 1) /. FitValues)], 
+    If[(First@First[z] /. FitValues) === 
+        0 || (First@First[z] === y /. FitValues), Pi I, 
+      2 Pi I] revertallbranchG[Rest[z], First@First[z], var, 
+      FitValues], 0],
   True,
-  G[z, var]
-  ]
-*)
+  G[First /@ z, y]]
 
 MoveVarofG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
- MoveVarofG[G[x, z], var, 
-   FitValues]= Expand[Expand[
-     Which[FreeQ[{x, z}, var], G[x, z], Length[x] === 1, 
-      tailmove[G[x, z], var, FitValues], Length[x] > 1, 
-      normGvar0[x/z, var, FitValues] + 
-         Expand[ddG[x, z, var] /. 
-              dlog[kk_] :> 
-               Total[(#1[[2]] dlog[#1[[1]]] &) /@ (If[First[#1], 
+ MoveVarofG[G[x, z], var, FitValues] = 
+  Expand[Expand[
+      Which[FreeQ[{x, z}, var], G[x, z], Length[x] === 1, 
+       tailmove[G[x, z], var, FitValues], Length[x] > 1, 
+       normGvar0[x/z, var, FitValues] + 
+          Expand[ddG[x, z, var] /. 
+               dlog[kk_] :> 
+                Total[(#1[[2]] dlog[#1[[1]]] &) /@ (If[First[#1], 
                     Last[#1], Message[MoveVarofG::notlinearred, kk];
                     Abort[];] &)[islinearreducible[kk, var]]] /. 
-             dlog[kk_] :> 0 /; FreeQ[kk, var] /. 
-            dlog[xx_] /; ! FreeQ[xx, var] :> 
-             dlog[var + (xx /. var -> 0)/D[xx, var]] /. 
-           G[xx__] :> MoveVarofG[G[xx], var, FitValues]] //. 
-        dlog[var + aa_.] G[xx_, var] :> G[Prepend[xx, -aa], var] //. 
-       dlog[var + aa_.] :> G[{-aa}, var]]] /. 
-    G[{1, xx___}, 1] :> (regwordabove[myword[1, xx], {1}] /. 
-    myword[zz__] :> G[{zz}, 1])]
+              dlog[kk_] :> 0 /; FreeQ[kk, var] /. 
+             dlog[xx_] /; ! FreeQ[xx, var] :> 
+              dlog[var + (xx /. var -> 0)/D[xx, var]] /. 
+            G[xx__] :> MoveVarofG[G[xx], var, FitValues]] //. 
+         dlog[var + aa_.] G[xx_, var] :> G[Prepend[xx, -aa], var] //. 
+        dlog[var + aa_.] :> G[{-aa}, var]]] /. 
+     G[{1, xx___}, 
+       1] :> (regwordabove[myword[1, xx], {1}] /. 
+        myword[zz__] :> G[{zz}, 1])] 
 
 (* here we use var = 10^-80 to fit branch, it's usually enough, 
 but it will lead some errors. *)
@@ -367,7 +401,8 @@ MoveVar[x_, var_, FitValues_ : {}] :=
       MoveVarofG[G[xx/y, 1], var, FitValues],
       G[xx_,y_]/;MatchQ[xx,{0..}]&&!FreeQ[y,var]&&y=!=var:>
       (Length[xx]!)^(-1)(G[{1/(1-y)},1])^Length[xx]
-      }] /. mylog -> Log
+      }] /. mylog -> Log /. G[zz_, var] :> 
+  revertallbranchG[{#, -1} & /@ zz, var, var, FitValues]
 
 preautoGint[x_, var_, FitValues_ : {}] := 
  FixedPoint[
