@@ -11,34 +11,50 @@ Numerical Multiple Polylogarithm (or Generalized Polylogarithm, Goncharov Polylo
 
 A numerical realization of multiple polylogarithm (or Goncharov polylogarithm, generalized polylogarithm) in pure Mathematica based on the algorithm given in this paper [0410259](https://arxiv.org/abs/hep-ph/0410259). These polylogarithms are widely used in the calculation of Feynman integrals and amplitudes.
 
-This short code provides a function `numG` to numerically calculate multiple polylogarithms. For example, G_{1,1,1}(2,5.1212,-1,2+I) is given by
+This short code provides a function `MPLG` to numerically calculate multiple polylogarithms. For example,
 ```Mathematica
-In[1]:= numG[{2,5.1212,-1},2+I]
-Out[1]= -0.22414260773807870769808034254340050458793786499014 + 
-         0.19078434730044807965215134847688913260135197911168 I
+In[1]:= MPLG[{2,5,-1},2+I]
+Out[1]= MPLG[{2,5,-1},2+I]
+
+In[2]:= MPLG[{2,5.1212,-1},2+I]
+Out[2]= -0.224143+0.190784 I
+
+In[3]:= N[MPLG[{2,5,-1},2+I],50]
+Out[3]= -0.23167350662300578240105093305732823163512296305387
+        +0.19529344255704520149638632931648075752227244885098 I
+
+(* we can even do numerical integration *)
+
+In[4]:= NIntegrate[MPLG[{0,1,0},x]/(x-Pi),{x,1/3,1/2},WorkingPrecision->20]
+Out[4]= -0.079243361725535382729
+
+In[5]:= N[MPLG[{Pi, 0, 1, 0}, 1/2] - MPLG[{Pi, 0, 1, 0}, 1/3], 20]
+Out[5]= -0.079243361725535382729
 ```
+
+However, the determination of the bound of the series (according to a given precision) in this code is based on an empirical formula, and its correctness is not proven.
+
 A related function `numLi` can be used to calculate multiple Li functions Li_{a1,...,an}(z1,...,zn), for example 
 ```Mathematica
-In[2]:= numLi[{4,3},{10,-5}]
-Out[2]= - 2.9589260121255572590640327182307418000466293019986040673168 + 
+In[6]:= numLi[{4,3},{10,-5}]
+Out[6]= - 2.9589260121255572590640327182307418000466293019986040673168 + 
          22.6122376480634386402336378167074133584999533678250847235297 I
 
 (* check an identity *)
 
 In[3]:= numLi[{4},{10}]numLi[{3},{-5}]-(numLi[{4,3},{10,-5}]+numLi[{3,4},{-5,10}]+numLi[{7},{-50}])
-Out[3]= 0.*10^-58 + 0.*10^-58 I
+Out[3]= 0.*10^-48+0.*10^-48 I
 ```
 and Multiple Zeta Value `numMZV[{m1,...,mn}]` is simply given by `numLi[{m1,...,mn},{1,...,1}]`.
 
-The default precision of `numG` and `numLi` is 50, and one can get a higher precision by adding it manually to functions, for example,
+The default precision of `numLi` is 50, and one can get a higher precision by adding it manually to functions, for example,
 ```Mathematica
-In[4]:= numG[{2,5.1212,-1},2+I,100]
-Out[4]= -0.22414260773807870769808034254340050458793786499014
-           17236003391038022863773587694654849571042358585353 + 
-         0.19078434730044807965215134847688913260135197911168
-           20844226004116650659596789737133041661049519961099 I
+In[7]:= numLi[{4,3},{10,-5},100]
+Out[7]= - 2.9589260121255572590640327182307418000466293019986
+            0406731684237589601496921051562174171870886557715
+        + 22.612237648063438640233637816707413358499953367825
+           08472352973908023876385168646607931361692977597799 I
 ```
-However, the determination of the bound of the series (according to a given precision) is based on an empirical formula, and its correctness is not proven.
 
 ### One-dimensional Integral
 
@@ -78,45 +94,44 @@ and then we can calculate all remaining integral
 from the definition of G function. 
 
 However, G({a1(0),...,an(0)},z) usually diverges when a1(0)=1 or an(0)=0, we use the 
-shuffle regularization used in [1403.3385](https://arxiv.org/abs/1403.3385) to get the finite result. On the other hand,
-eq.(1) usually depands on the branch you choice, otherwise we can only get a 
-funtion with the same symbol. The other steps are all algebraic, so if (1) is correct 
-(on a given region), the whole reduction is correct (on the given region). In our 
-realization, one could add fitting values to support numerical checks of eq.(1) 
-in the recursion, otherwise it will not check (1).
+shuffle regularization used in [1403.3385](https://arxiv.org/abs/1403.3385) to get the finite result. 
 
-In the code, this is done by a function `MoveVar[Gfuncs,var,FitValues]`. 
+What's more, we can first assume that t is a very small positive number such that 
+the integral will never meet nonzero singularities. After getting the answer, we could
+use analytic continuation to fix the answer in other regions, where one should add 
+fitting values `FitValues` to tell the code the region.
+
+In this code, this is done by a function `MoveVar[Gfuncs,var,FitValues]`. 
 `FitValues` are very important for the choice of branches. If there's no `FitValues`, 
 one can get a result, but it is usually not correct. For example,
 ```Mathematica
 (* an example with and without FitValues *)
 
-In[5]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t]
+In[8]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t]
 
-Out[5]= -I Pi+G[{0},t]-I Pi G[{0},t]+1/2 G[{0},t]^2+I Pi G[{1/a},t]-G[{0},t] G[{1/a},t]
-        -G[{0},t] G[{1/b},t]+G[{1/a},t] G[{1/b},t]-G[{1/c},t]+G[{0,1/a},t]
-        -G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+G[{1/b,0},t]-G[{1/b,1/a},t]
-        +G[{b/(1+b),1},1]-G[{0},t] Log[1/b]+G[{1/a},t] Log[1/b]+Log[c]
+Out[8]= G[{0},t]+1/2 G[{0},t]^2-G[{0},t] G[{1/a},t]-G[{0},t] G[{1/b},t]
+       +G[{1/a},t] G[{1/b},t]-G[{0},t] G[{b/(1+b)},1]+G[{1/a},t] G[{b/(1+b)},1]
+       -G[{1/c},t]+G[{1-c/(1+c)},1]+G[{0,1/a},t]-G[{a/(1+a),1},1]
+       +G[{a/(1+a),b/(1+b)},1]+G[{1/b,0},t]-G[{1/b,1/a},t]+G[{b/(1+b),1},1]
 
-In[6]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t,{t->10,c->-1,a->3,b->1/5}]
+In[9]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t,{t->10,c->-2,a->3,b->1/5}]
 
-Out[6]= -I Pi +2 I Pi  G[{0},1/a]-2 I Pi  G[{0},1/b]+G[{0},t]-I Pi  G[{0},t]
-        +1/2 G[{0},t]^2+2 I Pi  G[{1/a},1/b]-G[{0},t] G[{1/a},t]+I Pi (-2 I Pi +G[{1/a},t])
-        +2 I Pi  G[{1/a-1/b},1/a]-G[{0},t] (-2 I Pi +G[{1/b},t])
-        +G[{1/a},t] (-2 I Pi +G[{1/b},t])-G[{1/c},t]+G[{0,1/a},t]-G[{a/(1+a),1},1]
-        +G[{a/(1+a),b/(1+b)},1]+G[{1/b,0},t]-G[{1/b,1/a},t]+G[{b/(1+b),1},1]
-        -G[{0},t] Log[1/b]+(-2 I Pi +G[{1/a},t]) Log[1/b]+Log[c]
+Out[9]= G[{0},t]+2 I Pi G[{0},t]+1/2 G[{0},t]^2+2 I Pi G[{1/a},1/b]-2 I Pi G[{1/a},t]
+       -G[{0},t] G[{1/a},t]+2 I Pi G[{1/a-1/b},1/a]-G[{0},t] G[{1/b},t]
+       +G[{1/a},t] G[{1/b},t]-2 I Pi G[{b/(1+b)},1]-G[{0},t] G[{b/(1+b)},1]
+       +G[{1/a},t] G[{b/(1+b)},1]-G[{1/c},t]+G[{1-c/(1+c)},1]+G[{0,1/a},t]
+       -G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+G[{1/b,0},t]-G[{1/b,1/a},t]
+       +G[{b/(1+b),1},1]+2 I Pi Log[1/a]-2 I Pi Log[1/b]
 
 (* check *)
 
-In[7]:= (%5 - (G[{a,b},1/t]+G[{1-c t}))/.{t->10,c->-1,a->3,b->1/5}]/.G->numG
+In[10]:= (%8 - (G[{a,b},1/t]+G[{1-c t},1]))/.{t->10,c->-2,a->3,b->1/5}/.G->MPLG//N
 
-Out[7]= -19.7392088021787172376689819997523022706273988144815812528267 + 
-         16.802171503290900150206155902228343811048017874930332000610 I
+Out[10]= -19.7392+16.8022 I
 
-In[8]:= (%6 - (G[{a,b},1/t]+G[{1-c t}))/.{t->10,c->-1,a->3,b->1/5}]/.G->numG
+In[11]:= (%9 - (G[{a,b},1/t]+G[{1-c t},1]))/.{t->10,c->-2,a->3,b->1/5}/.G->MPLG//N[#, 50]&
 
-Out[8]= 0.*10^-58 + 0.*10^-58 I
+Out[11]= 0.*10^-98+0.*10^-98 I
 ```
 
 
@@ -127,13 +142,13 @@ It's not a very efficient realization. We could calculate some examples by Ginac
 
 Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh on WSL 1. They use the same CPU (i7-8700). Ginsh will take a short time on IO.
 
-- `numG[{1, 2, 3, 4, 5}, 6, 100]` will take ~1.2s, and Ginac will take ~1.3s
-- `numG[{5, 4, 3, 2, 1}, 6, 100]` will take ~1.2s, and Ginac will take ~64s (???)
-- `numG[{1, 2, 3, 4, 5, 6}, 7, 100]` will take ~3.9s, and Ginac will take ~7s 
-- `numG[{1, 2, 3, 4, 5, 6, 7}, 8, 100]` will take ~10s, and Ginac will take ~40s
+- `N[MPLG[{1, 2, 3, 4, 5}, 6], 100]` will take ~1.2s, and Ginac will take ~1.3s
+- `N[MPLG[{5, 4, 3, 2, 1}, 6], 100]` will take ~1.2s, and Ginac will take ~64s (???)
+- `N[MPLG[{1, 2, 3, 4, 5, 6}, 7], 100]` will take ~3.9s, and Ginac will take ~7s 
+- `N[MPLG[{1, 2, 3, 4, 5, 6, 7}, 8], 100]` will take ~10s, and Ginac will take ~40s
 
 It's much slower when there're non-rational numbers, but Ginac doesn't care it. It's really important to speed up the sum of lots of float numbers for the series calculation.
-It's also possible to speed up recursions. For example, `numG[{1, 2, 3, 4, 5}, 6, 100]` and `numG[{1, 2, 3, 4, 5}, 6, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
+It's also possible to speed up recursions. For example, `MPLG[{1, 2, 3, 4, 5}, 6, 100]` and `MPLG[{1, 2, 3, 4, 5}, 6, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
 
 ## Related Packages
 

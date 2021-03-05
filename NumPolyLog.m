@@ -11,7 +11,8 @@ Shuffle[s1_,s2_]:=Block[{p,tp,ord},p=Transpose[Permutations[Join[(1&)/@s1,(0&)/@
 Shufflep[_,{}]:={}
 Shufflep[{},_]:={}
 Shufflep[s1_,s2_]:=Block[{p,tp,ord},p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]];tp=BitXor[p,1];ord=Accumulate[p] p+(Accumulate[tp]+Length[s1]) tp;Transpose[Outer[Part,{Join[s1,s2]},ord,1][[1]]]]
-minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,If[Limit[f,var->0]===0,minideg[f/var,var]+1,0]];
+(*minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,If[Limit[f,var->0]===0,minideg[f/var,var]+1,0]];*)
+minideg[f_,var_]:=Exponent[f,var,Min]
 poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
@@ -62,19 +63,29 @@ goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-PolyLog[Length[z],1/Last[z]];
 accG[{z_},prec_:50]:=Log[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
 accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
-numG[z_,0,prec_:50]/;(!MatchQ[z,{0..}]):=0
-numG[{0..},0,prec_:50]:=ComplexInfinity
-numG[z_,y2_,prec_:50]/;MatchQ[z,{0..}]&&(y2=!=0):=N[Log[y2]^Length[z]/Length[z]!,prec+10];
-(* remove tail zero *)
-numG[{zz___,0},y2_,prec_:50]/;(y2=!=0):=N[Expand[With[{z={zz,0}},With[{kk=tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]numG[{zz},y2,prec]]-Sum[numG[Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,prec],{m,0,len-kk-1}])]]],prec+10]
-numG[z_,y_,prec_:50]/;(Last[z]!=0):=N[If[Rationalize[First[z]/y,0]===1,ComplexInfinity,extendedG[0,{},Rationalize[z/y,0],1,0]/.goodG[x_]:>goodG[Rationalize[x,0]]//.{goodG[x_]:>accG[x,prec]}],prec+10]
-numLi[m_,x_,prec_:50]:=(-1)^Length[m]numG[longhand[m,Rest[FoldList[#1/#2&,1,x]]],1,prec]
-numMZV[m_,prec_:50]:=numLi[m,ConstantArray[1,Length[m]],prec]
-
+SetAttributes[MPLG, NumericFunction]
+MPLG[z_, 0] /; (! MatchQ[z, {0 ..}]) := 0
+MPLG[{0 ..}, 0] := ComplexInfinity
+MPLG[z_, y2_] /; MatchQ[z, {0 ..}] && (y2 =!= 0) := Log[y2]^Length[z]/Length[z]!;
+MPLG[zzz_, y_ /; y =!= 0] /; AnyTrue[Append[zzz, y], InexactNumberQ] :=
+ With[{prec = Precision[Append[zzz, y]], z = Chop@zzz}, 
+  If[Last[z] === 0, 
+   Expand[With[{zz = Most[z]}, 
+     With[{kk = tailzero[z], len = Length[z]}, 
+      1/kk (If[y === 1, 0, Log[y] MPLG[zz, y]] - 
+         Sum[MPLG[
+           Join[z[[1 ;; m]], {0}, 
+            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
+            ConstantArray[0, kk - 1]], y], {m, 0, len - kk - 1}])]]], 
+   N[If[Rationalize[First[z]/y, 0] === 1, ComplexInfinity, 
+     extendedG[0, {}, Rationalize[z/y, 0], 1, 0] /. 
+       goodG[x_] :> goodG[Rationalize[x, 0]] //. {goodG[x_] :> 
+        accG[x, prec]}], prec]]]
+numLi[m_, x_, prec_ : 50] := N[(-1)^Length[m] MPLG[longhand[m, Rest[FoldList[#1/#2 &, 1, x]]], 1], prec]
+numMZV[m_, prec_ : 50] := numLi[m, ConstantArray[1, Length[m]], prec]
 
 (*
 TODO : Be careful!!!! Check!!!! Rename functions!!! 
-       Add the suppout of integrals on (0,infty).
 *)
 
 (* 
@@ -273,7 +284,7 @@ linearfactorize[func_, var_] :=
     mylog[aa_] + mylog[bb_] /; FreeQ[{aa, bb}, var] :> mylog[aa bb], 
     mylog[aa_] - mylog[bb_] /; FreeQ[{aa, bb}, var] :> mylog[aa/bb]}]
 
-ddG[y_, z_, var_] := If[Length[y] === 1, dlog[] G[y, z],
+ddG[y_, z_, var_] := If[Length[y] === 1, dlog[1 - z/First[y]],
    -dlog[Last[y]] G[Most[y], z] + dlog[z - First[y]] G[Rest[y], z] + 
     Sum[dlog[
        y[[i]] - y[[i + 1]]] (G[Delete[y, i + 1], z] - 
@@ -337,13 +348,13 @@ revertallbranchG[z, y, var, FitValues] =
       2 Pi I] revertallbranchG[Rest[z], First@First[z], var, 
       FitValues], 0],
   True,
-  G[First /@ z, y]]
+  G[First /@ z, y]]/.G[{0},a_]:>Log[a]/;FreeQ[a,var]
 
+(* we first get the answer at t>0 & t~0 *)
 MoveVarofG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
  MoveVarofG[G[x, z], var, FitValues] = 
   Expand[Expand[
-      Which[FreeQ[{x, z}, var], G[x, z], Length[x] === 1, 
-       tailmove[G[x, z], var, FitValues], Length[x] > 1, 
+      Which[FreeQ[{x, z}, var], G[x, z], Length[x] >= 1, 
        normGvar0[x/z, var, FitValues] + 
           Expand[ddG[x, z, var] /. 
                dlog[kk_] :> 
@@ -360,9 +371,7 @@ MoveVarofG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] :=
        1] :> (regwordabove[myword[1, xx], {1}] /. 
         myword[zz__] :> G[{zz}, 1])] 
 
-(* here we use var = 10^-80 to fit branch, it's usually enough, 
-but it will lead some errors. *)
-
+(*
 tailmove[G[{x_}, z_], var_, FitValues_ : {}] := 
  With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
  If[FreeQ[x, var], G[{x}, z], 
@@ -380,35 +389,50 @@ tailmove[G[{x_}, z_], var_, FitValues_ : {}] :=
               mylog -> Log} //. Rationalize[Append[nonvarFitValues,var->10^-80], 0], 1000], 
           0] (Pi I)]], Message[MoveVarofG::notlinearred, 1 - z/x]; 
      Abort[];]]] /. {G[{}, _] :> 1}]
+*)
 
 MoveVarofG::notlinearred = "`1` is not linear reducible!";
 
+preMoveVar[G[z_, y_], var_, FitValues_ : {}] := Which[
+  FreeQ[{z, y}, var] || y === var && FreeQ[z, var], G[z, y],
+  y === 0, 0,
+  MatchQ[z, {0 ..}] && ! FreeQ[y, var] && y =!= var,
+  (Length[z]!)^(-1) (G[{1/(1 - y)}, 1])^Length[z],
+  ! MatchQ[z, {0 ..}] && Last[z] === 0 && (! FreeQ[y, var]) && 
+   y =!= var,
+  Expand[With[{kk = tailzero[z], len = Length[z]}, 
+    1/kk (G[{0}, y] G[Most[z], y] - 
+       Sum[G[Join[z[[1 ;; m]], {0}, 
+          z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
+          ConstantArray[0, kk - 1]], y], {m, 0, len - kk - 1}])]],
+  (! FreeQ[z, var]) && FreeQ[y, var],
+  MoveVarofG[G[z, y], var, FitValues],
+  Last[z] =!= 
+    0 && (((! FreeQ[z, var]) && ! FreeQ[y, var]) || (! FreeQ[y, var] &&
+        y =!= var)),
+  MoveVarofG[G[z/y, 1], var, FitValues]]
+
 MoveVar[x_, var_, FitValues_ : {}] := 
- Expand[x /. 
-     G[_, 0] :> 
-      0 //. {G[xx_, y_] /; ((! FreeQ[xx, var]) && FreeQ[y, var]) :> 
-      MoveVarofG[G[xx, y], var, FitValues], 
-      G[z_,y_]/;!MatchQ[z,{0..}]&&Last[z]===0&&(! FreeQ[y, var])&&y=!=var:> Expand[
-    With[{kk = tailzero[z], len = Length[z]}, 
-     1/kk (G[{0},y] G[Most[z],y] - Sum[
-         G[
-          Join[z[[1 ;; m]], {0}, 
-           z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
-           ConstantArray[0, kk - 1]], y], {m, 0, 
-          len - kk - 1}])]],
-     G[xx_, y_] /; (Last[xx]=!=0 && (((! FreeQ[xx, var])&&! FreeQ[y, var]) || (! 
-            FreeQ[y, var] && y =!= var))) :> 
-      MoveVarofG[G[xx/y, 1], var, FitValues],
-      G[xx_,y_]/;MatchQ[xx,{0..}]&&!FreeQ[y,var]&&y=!=var:>
-      (Length[xx]!)^(-1)(G[{1/(1-y)},1])^Length[xx]
-      }] /. mylog -> Log /. G[zz_, var] :> 
-  revertallbranchG[{#, -1} & /@ zz, var, var, FitValues]
+ Expand[x /. {G[z_, y_] /; 
+      Length[z] > 1 :> (preMoveVar[G[z, y], var, FitValues] /. 
+       G[zz_, var] :> 
+        revertallbranchG[{#, -1} & /@ zz, var, var, FitValues]), 
+    G[z_, y_] /; 
+      Length[z] == 
+       1 :> (If[
+         Variables[{z, y} /. FitValues] === {}, # + 
+          Pi I Rationalize[(numG[z /. FitValues, 
+                  y /. FitValues] - # /. FitValues /. 
+               G -> numG)/(Pi I), 0], #] &[
+       preMoveVar[G[z, y], var, FitValues]])}]
 
 preautoGint[x_, var_, FitValues_ : {}] := 
  FixedPoint[
   Expand[# //. 
-     G[xx_, var] G[yy_, var] :> 
-      Total[G[#, var] & /@ Shuffle[xx, yy]]] &, 
+     {G[xx_, var] G[yy_, var] :> 
+      Total[G[#, var] & /@ Shuffle[xx, yy]],
+      G[{xx_}, var]^k_Integer /; k>1 :> 
+      k! G[ConstantArray[xx,k],var]}] &, 
   MoveVar[x, var, FitValues]]
 
 GIntegrate::notlinearred = "`1` is not linear reducible!";
@@ -428,3 +452,12 @@ preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
 
 GIntegrate[x_, var_, FitValues_ : {}] := 
  preGIntegrate[preautoGint[x, var, FitValues], var]
+
+(* the integral is assumed to be converged *)
+GIntegrate[x_, {var_, a_, b_}, FitValues_ : {}] := 
+ With[{nonvarFitValues = DeleteCases[FitValues, var -> _]}, 
+  With[{hh = 
+      preGIntegrate[
+       preautoGint[x, var, Join[nonvarFitValues, {var -> 10^-80}]], 
+       var]}, (hh /. var -> b) - (hh /. var -> a)] /. 
+   G[zz_, Infinity] :> regGinf[G[zz, Infinity]]]
