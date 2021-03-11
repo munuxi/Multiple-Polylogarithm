@@ -63,12 +63,16 @@ goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-PolyLog[Length[z],1/Last[z]];
 accG[{z_},prec_:50]:=Log[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
 accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
+(* defind MPLG *)
 SetAttributes[MPLG, NumericFunction]
+MPLG[{}, _]  := 1
 MPLG[z_, 0] /; (! MatchQ[z, {0 ..}]) := 0
 MPLG[{0 ..}, 0] := ComplexInfinity
+MPLG[{a_ /; a =!= 0}, b_] := Log[1 - b/a]
 MPLG[z_, y2_] /; MatchQ[z, {0 ..}] && (y2 =!= 0) := Log[y2]^Length[z]/Length[z]!;
-MPLG[zzz_, y_ /; y =!= 0] /; AnyTrue[Append[zzz, y], InexactNumberQ] :=
- With[{prec = Precision[Append[zzz, y]], z = Chop@zzz}, 
+MPLG[z_, y2_] /; (MatchQ[Most[z],{0..}]&&Last[z]=!=0) := -PolyLog[Length[z],y2/Last[z]];
+MPLG[zzz_, y_ /; y =!= 0] /; AllTrue[Append[zzz, y], NumberQ] && AnyTrue[Append[zzz, y], InexactNumberQ] :=
+ With[{prec = Precision[Append[zzz, y]], z = Rationalize[zzz,10^(-Precision[zzz])]}, 
   If[Last[z] === 0, 
    Expand[With[{zz = Most[z]}, 
      With[{kk = tailzero[z], len = Length[z]}, 
