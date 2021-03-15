@@ -1,5 +1,7 @@
 (* ::Package:: *)
 
+Get["MPLdata`"];
+
 (* basic functions*)
 shorthand[vec_]:=Block[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
@@ -12,7 +14,8 @@ Shufflep[_,{}]:={}
 Shufflep[{},_]:={}
 Shufflep[s1_,s2_]:=Block[{p,tp,ord},p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]];tp=BitXor[p,1];ord=Accumulate[p] p+(Accumulate[tp]+Length[s1]) tp;Transpose[Outer[Part,{Join[s1,s2]},ord,1][[1]]]]
 (*minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,If[Limit[f,var->0]===0,minideg[f/var,var]+1,0]];*)
-minideg[f_,var_]:=Exponent[f,var,Min]
+minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]===0,-minideg[1/f,var],Chop@Limit[f,var->0]===0,minideg[f/var,var]+1,True,0]]
+deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
 poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
@@ -25,6 +28,71 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 (*poorNG[z_List,y_,prec_:50]:=With[{hh=Chop[z]},With[{jj=Min[Abs[DeleteCases[hh,0]/y]],kk=shorthand[hh]},If[Length[kk]<3,poorsum[Sequence@@kk,y,prec],Which[jj<=1,0,jj\[GreaterEqual]1.2,levinsum[Sequence@@kk,y,prec],True,poorsum[Sequence@@kk,y,prec]]]]]*)
 *)
 
+(*some symbol calculation*)
+GetAlphabet[x_]:=Cases[x,Tensor[y__]:>y,Infinity]//Union
+tensor[___,1|-1,___]:=0
+tensor[x___,1/y_,w___]:=-tensor[x,y,w]
+tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
+tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
+expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
+ExpandTensor[exp_]:=expandTensor[exp/.Dispatch[#->Factor[#]&/@GetAlphabet[exp]]/.Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]
+
+(* to symbol *)
+preGtoSymbol[GT[{}, _, Tensor[b___]]] := Tensor[b]
+preGtoSymbol[GT[a_, z_, Tensor[b___]]] := 
+ Sum[preGtoSymbol[
+   GT[Delete[a, i], z, 
+    Tensor[Which[Length[a] == 1, (a[[i]] - z)/(a[[i]] - 0), i == 1, (
+      a[[i]] - z)/(a[[i]] - a[[i + 1]]), i == Length[a], (
+      a[[i]] - a[[i - 1]])/(a[[i]] - 0), True, (a[[i]] - a[[i - 1]])/(
+      a[[i]] - a[[i + 1]])], b]]], {i, Length[a]}]
+slowGtoSymbol[G[a_, z_]] := preGtoSymbol[GT[a, z, Tensor[]]]
+
+generateGtosymbol[
+  weight_] := (G[
+     Table[ToExpression["$a" <> ToString[i] <> "_"], {i, 
+       weight}], $zz_] -> 
+    ExpandTensor[
+     slowGtoSymbol[
+      G[Table[ToExpression["$a" <> ToString[i]], {i, 
+         weight}], $zz]]]) /. Rule -> RuleDelayed
+
+removetailzero[anyG[z_, y_]] := 
+ Which[z === {}, 1, Last[z] === 0, 
+  Expand[With[{zz = Most[z]}, 
+    With[{kk = tailzero[z], len = Length[z]}, 
+     1/kk (If[y === 1, 0, Log[y] removetailzero@anyG[zz, y]] - 
+        Sum[removetailzero@
+          anyG[Join[z[[1 ;; m]], {0}, 
+            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
+            ConstantArray[0, kk - 1]], y], {m, 0, len - kk - 1}])]]], 
+  True, anyG[z, y]]
+
+GtoSymbol[exp_] := 
+ With[{maxlen = 
+    Max[Length /@ Union@Cases[1 + exp, G[x_, _] :> x, Infinity]]}, 
+  If[maxlen > First@$tosymbolGstored, 
+   $tosymbolGstored = {maxlen, 
+     Join[Last@$tosymbolGstored, 
+      Table[generateGtosymbol[w], {w, 1 + First@$tosymbolGstored, 
+        maxlen}]]};
+   exp /. G[x__] :> removetailzero[anyG[x]] /. anyG -> G /. 
+    Last@$tosymbolGstored, 
+   exp /. G[x__] :> removetailzero[anyG[x]] /. anyG -> G /. 
+    Last@$tosymbolGstored]]
+
+PolyLogToG[exp_] := 
+ exp /. {Log[x_] :> G[{0}, x], 
+   PolyLog[k_, x_] :> -G[Append[ConstantArray[0, k - 1], 1], x]}
+
+ToSymbol[exp_] := 
+ With[{hh = GtoSymbol@PolyLogToG@exp}, 
+  ExpandTensor@FixedPoint[
+   Expand[# /. Pi->0 /. {Tensor[a___] Tensor[b___] :> 
+         Total[Tensor @@@ Shuffle[{a}, {b}]], 
+        Tensor[a___]^b_Integer /; b >= 2 :> 
+         Tensor[a]^(b - 2) Total[Tensor @@@ Shuffle[{a}, {a}]]} /. 
+      Tensor[___, 1 | -1, ___] :> 0] &, hh /. Log[x_] :> Tensor[x]]]
 
 (* 
 extendedG is the extended G function introduced in the section 5.3 of 0410259 :
@@ -166,14 +234,14 @@ use a special Möbius transformation z/(1+z) to convert
 G({a1,...,an},infty) to G({...},1)'s.
 *)
 
-prespecialmobiustrans[
+mobiusinftoone[
   x_myword] := (If[# === -1, 0, myword[#/(1 + #)]] - myword[1] & /@ 
     x) //. {myword[y___, myword[p_] + q_, w___] :> 
     myword[y, p, w] + myword[y, q, w], 
    myword[y___, -myword[p_], w___] :> -myword[y, p, w]}
 
 specialmobiustrans[x_myword] := 
-  regword[x, Infinity, {0}] /. myword[y__] :> prespecialmobiustrans[myword[y]] /. 
+  regword[x, Infinity, {0}] /. myword[y__] :> mobiusinftoone[myword[y]] /. 
    myword[yy__] :> G[Simplify /@ {yy}, 1];
 
 (*
@@ -215,24 +283,70 @@ regGallnear1[z_] :=
    G[zz_, Infinity] :> regGinf[G[zz, Infinity]] /. 
   G[zz_, 1] :> (-1)^Length[zz] G[Reverse[1 - zz], 1]
 
-normGvar0[z_, var_, FitValues_ : {}] :=
+lastpos[list_, pat_] := 
+ With[{hh = FirstPosition[Reverse[list], pat]}, 
+  If[hh === Missing["NotFound"], 0, 1 + Length[list] - First@hh]]
+
+(*
+branchMPLG[z_, y_] := With[{lp = lastpos[z, {_, -1}]},
+  If[lp === 0, MPLG[First /@ z, y],
+   branchMPLG[ReplacePart[z, lp -> z[[lp]] {1, -1}], y] - 
+    2 Pi I MPLG[First /@ z[[lp + 1 ;;]], 
+      First[z[[lp]]]] branchMPLG[{#[[1]] - First[z[[lp]]], 
+         If[(#[[2]] === -1) && (#[[1]] <= First[z[[lp]]]), 
+          1, #[[2]]]} & /@ z[[;; lp - 1]], y - First[z[[lp]]]]]]
+*)
+
+branchlead[func_, var_, range_, FitValues_ : {}] := 
+ With[{nonvarFitValues = DeleteCases[FitValues, var -> _], 
+   md = minideg[func /. DeleteCases[FitValues, var -> _], var]},
+  With[{lead = SeriesCoefficient[func, {var, 0, md}], 
+    numlead = 
+     SeriesCoefficient[func /. nonvarFitValues, {var, 0, md}]},
+   Which[
+    FreeQ[func, var], {0, func, 1},
+    ! NumberQ[numlead], {0, lead, 1},
+    md == 0 && ! Element[numlead, Reals], {0, lead, 1},
+    md == 0 && ! (First[range] < numlead < Last[range]), {0, lead, 1},
+    md == 0 && First[range] < numlead < Last[range],
+    With[{subdeglead = deglead[func - lead /. nonvarFitValues, var]},
+     {0, lead, If[Last[subdeglead] >= 0, 1, -1]}],
+    True, {md, lead, 1}
+    ]]]
+
+branchG[z_, y_, FitValues_ : {}] := With[{lp = lastpos[z, {_, -1}]},
+  If[lp === 0, G[First /@ z, y] /. G[{}, _] :> 1,
+   branchG[ReplacePart[z, lp -> z[[lp]] {1, -1}], y, FitValues] - 
+    2 Pi I If[z[[lp + 1 ;;]] === {}, 1, 
+      regwordabove[
+        myword @@ (First /@ z[[lp + 1 ;;]]), {First[z[[lp]]]}] /. 
+       myword[x__] :> 
+        G[{x}, First[z[[lp]]]]] branchG[{#[[1]] - First[z[[lp]]],
+         Which[! NumberQ[(First[z[[lp]]] - #[[1]]) /. FitValues],
+          1,
+          ! Element[(First[z[[lp]]] - #[[1]]) /. FitValues, Reals],
+          1,
+          (#[[2]] === -1) && ((First[z[[lp]]] - #[[1]] /. 
+               FitValues) >= 0), 1,
+          True, #[[2]]]} & /@ z[[;; lp - 1]], y - First[z[[lp]]], 
+      FitValues]]]
+
+normGvar0[z_, var_, FitValues_ : {}] := 
  With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
   Which[
    z === {}, 1,
    AnyTrue[DeleteCases[z /. nonvarFitValues, 0], 
     Limit[1/#, var -> 0] === 0 &], 0,
-   Last[z] === 0,
-   Expand[
-    With[{kk = tailzero[z], len = Length[z]}, 
+   Last[z] === 0, 
+   Expand[With[{kk = tailzero[z], len = Length[z]}, 
      1/kk (-Sum[
          normGvar0[
           Join[z[[1 ;; m]], {0}, 
            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
            ConstantArray[0, kk - 1]], var, FitValues], {m, 0, 
           len - kk - 1}])]],
-   First[z] === 1,
-   Expand[
-    With[{kk = headone[z], len = Length[z]}, 
+   First[z] === 1, 
+   Expand[With[{kk = headone[z], len = Length[z]}, 
      If[len == 1, 0, 
       1/kk (-Sum[
           normGvar0[
@@ -240,204 +354,115 @@ normGvar0[z_, var_, FitValues_ : {}] :=
             z[[m + 1 ;;]]], var, FitValues], {m, kk + 1, len}])]]],
    Limit[First[z] /. nonvarFitValues, var -> 0] =!= 1 && 
     Limit[Last[z] /. nonvarFitValues, var -> 0] =!= 0, 
-   G[z, 1] /. var -> 0,
-   Limit[First[z] /. nonvarFitValues, var -> 0] === 1,
-   With[{hh = headone[z /. nonvarFitValues /. var -> 0]}, 
-    With[
-      {kk = regGallnear1[Function[deg, 
-            If[deg === 0, {0, 1 - # /. var -> 0}, {deg, 
-              SeriesCoefficient[1 - #, {var, 0, deg}]}]][
-           minideg[1 - # /. nonvarFitValues, var]] & /@ z[[;; hh]]]}, 
-     kk normGvar0[z[[hh + 1 ;;]], var, FitValues] - 
-      Total[(normGvar0[#, var, FitValues] & /@ 
-         Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]
-     ]],
-   Limit[Last[z] /. nonvarFitValues, var -> 0] === 0,
-   With[{hh = tailzero[z /. nonvarFitValues /. var -> 0]},
+   branchG[If[#[[1]] > 0, {0, 1}, 
+       Rest[#]] & /@ (branchlead[#, var, {0, 1}, FitValues] & /@ z), 
+    1, FitValues], (* be careful *)
+   Limit[Last[z] /. nonvarFitValues, var -> 0] === 0, 
+   With[{hh = 
+      tailzero[Rationalize@Chop[Limit[z /. nonvarFitValues,var -> 0]]]}, 
     With[{kk = 
        regGallnear0[
-        Function[deg, 
-            If[deg === 0, {0, # /. var -> 0}, {deg, 
-              SeriesCoefficient[#, {var, 0, deg}]}]][
-           minideg[# /. nonvarFitValues, var]] & /@ z[[-hh ;;]]]}, 
+        Most[branchlead[#, var, {0, 1}, FitValues]] & /@ 
+         z[[-hh ;;]]]}, 
      kk normGvar0[z[[;; -hh - 1]], var, FitValues] - 
       Total[(normGvar0[#, var, FitValues] & /@ 
-         Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]
-     ]]
-   ]]
+         Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]],
+   Limit[First[z] /. nonvarFitValues, var -> 0] === 1, 
+   With[{hh = 
+      headone[Rationalize@Chop[z /. nonvarFitValues /. var -> 0]]}, 
+    With[{kk = 
+       regGallnear1[
+        Most[branchlead[#, var, {0, 1}, FitValues]] & /@ (1 - 
+           z[[;; hh]])]}, 
+     kk normGvar0[z[[hh + 1 ;;]], var, FitValues] - 
+      Total[(normGvar0[#, var, FitValues] & /@ 
+         Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]]]]]
 
 (* Newton-Leibniz reduction *)
 
-mylog[1] = 0;
-mylog[-1] = Pi I;
-mylogToG[exp_] := exp /. mylog[x_] :> G[{1/(1 - x)}, 1];
-PolyLogToG[exp_] :=  mylogToG[exp] /. PolyLog[k_,x_] :> - G[Append[ConstantArray[0,k-1],1],x];
-
-islinearreducible[rationalfunc_, var_] := 
- With[{hh = 
-     Rationalize@FactorList[rationalfunc]}, {#, If[#, hh, {}]} &[
-    NoneTrue[First /@ hh, D[#, {var, 2}] =!= 0 &]]] /; FreeQ[{x}, var]
-
-linearfactorize[func_, var_] := 
- With[{hh = FactorList[func]}, 
-  Total[#[[2]] mylog[#[[1]]] & /@ hh] /. 
-    mylog[x_] /; ! FreeQ[x, var] && 
-       x =!= var :> (mylog[var D[x, var]/(x /. var -> 0) + 1] + 
-       mylog[(x /. var -> 0)]) //. {mylog[aa_] bb_Integer /; 
-      FreeQ[aa, var] :> mylog[aa^bb], 
-    mylog[aa_] + mylog[bb_] /; FreeQ[{aa, bb}, var] :> mylog[aa bb], 
-    mylog[aa_] - mylog[bb_] /; FreeQ[{aa, bb}, var] :> mylog[aa/bb]}]
-
-ddG[y_, z_, var_] := If[Length[y] === 1, dlog[1 - z/First[y]],
-   -dlog[Last[y]] G[Most[y], z] + dlog[z - First[y]] G[Rest[y], z] + 
-    Sum[dlog[
-       y[[i]] - y[[i + 1]]] (G[Delete[y, i + 1], z] - 
-        G[Delete[y, i], z]), {i, 1, Length[y] - 1}]] /. 
-  dlog[x__] :> 0 /; FreeQ[{x}, var]
-
-decomposeheadsame[z_, y_, a_, func1_, func2_] := 
- Expand[If[First[z] =!= a || readfirstnotinpos[z, {a}, 1] === 1, 
-   func1[z, y], 
-   With[{kk = readfirstnotinpos[z, {a}, 1], len = Length[z]}, 
-    If[len == 1, func1[{a}, y], 
-     1/kk ( func1[{a}, y] decomposeheadsame[z[[2 ;;]], y, a, func1, 
-          func2] - 
-        Sum[decomposeheadsame[
-          Join[ConstantArray[a, kk - 1], z[[kk + 1 ;; m]], {a}, 
-           z[[m + 1 ;;]]], y, a, func1, func2], {m, kk + 1, len}])]]]]
-
-removetail[z_, y_, a_, func1_, func2_] := 
- Expand[If[Last[z] =!= a, func1[z, y], 
-   With[{kk = readfirstnotinpos[z, {a}, -1], len = Length[z]}, 
-    If[len == 1, func1[{a}, y], 
-     1/kk ( func1[{a}, y] removetail[z[[;; -2]], y, a, func1, 
-          func2] - 
-        Sum[removetail[
-          Join[z[[;; m]], {a}, z[[m + 1 ;; -kk - 1]], 
-           ConstantArray[a, kk - 1]], y, a, func1, func2], {m, 0, 
-          len - kk - 1}])]]]]
-
-(* -ie -> +ie *)
-revertallbranchG[z_, y_, var_, FitValues_ : {}] :=
-revertallbranchG[z, y, var, FitValues] =
- Which[
-  y === 0, 0,
-  z === {}, 1,
-  MatchQ[Last /@ z, {1 ..}], G[First /@ z, y],
-  FreeQ[y, var] && MatchQ[Last /@ z, {-1 ..}] && First@Last[z] === 0,
-  removetail[z, y, Last[z], G[First /@ #1, #2] &,
-   (-1)^Length[#1] G[#2 - Reverse[(First /@ #1)], #2] &],
-  FreeQ[y, var] && MatchQ[Last /@ z, {-1 ..}] && First@Last[z] =!= 0,
-  (-1)^Length[z] G[y - Reverse[(First /@ z)], y],
-  Last@First[z] === 1,
-  With[{hh = headone[Last /@ z]}, 
-   G[First /@ z[[;; hh]], y] revertallbranchG[z[[hh + 1 ;;]], y, var, 
-      FitValues] - 
-    Total[revertallbranchG[#, y, var, FitValues] & /@ 
-      Shufflep[z[[;; hh]], z[[hh + 1 ;;]]]]],
-  Last@First[z] === -1 && readfirstnotinpos[z, {First[z]}, 1] > 1, 
-  decomposeheadsame[z, y, First[z], 
-   revertallbranchG[#1, #2, var, FitValues] &, 
-   revertallbranchG[#1, #2, var, FitValues] &],
-  Last@First[z] === -1 && readfirstnotinpos[z, {First[z]}, 1] === 1,
-  revertallbranchG[Prepend[Rest[z], {First@First[z], 1}], y, var, 
-    FitValues]
-   - (* if +ie -> -ie, plus here *)
-   If[Variables[{z, y} /. FitValues] === {} && 
-     Element[First@First[z] /. FitValues, Reals] && 
-     If[y === Infinity, (First@First[z] /. FitValues) >= 
-       0, ((0 <= First@First[z]/y <= 1) /. FitValues)], 
-    If[(First@First[z] /. FitValues) === 
-        0 || (First@First[z] === y /. FitValues), Pi I, 
-      2 Pi I] revertallbranchG[Rest[z], First@First[z], var, 
-      FitValues], 0],
-  True,
-  G[First /@ z, y]]/.G[{0},a_]:>Log[a]/;FreeQ[a,var]
-
-(* we first get the answer at t>0 & t~0 *)
-MoveVarofG[G[x_, z_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
- MoveVarofG[G[x, z], var, FitValues] = 
-  Expand[Expand[
-      Which[FreeQ[{x, z}, var], G[x, z], Length[x] >= 1, 
-       normGvar0[x/z, var, FitValues] + 
-          Expand[ddG[x, z, var] /. 
-               dlog[kk_] :> 
-                Total[(#1[[2]] dlog[#1[[1]]] &) /@ (If[First[#1], 
-                    Last[#1], Message[MoveVarofG::notlinearred, kk];
-                    Abort[];] &)[islinearreducible[kk, var]]] /. 
-              dlog[kk_] :> 0 /; FreeQ[kk, var] /. 
-             dlog[xx_] /; ! FreeQ[xx, var] :> 
-              dlog[var + (xx /. var -> 0)/D[xx, var]] /. 
-            G[xx__] :> MoveVarofG[G[xx], var, FitValues]] //. 
-         dlog[var + aa_.] G[xx_, var] :> G[Prepend[xx, -aa], var] //. 
-        dlog[var + aa_.] :> G[{-aa}, var]]] /. 
-     G[{1, xx___}, 
-       1] :> (regwordabove[myword[1, xx], {1}] /. 
-        myword[zz__] :> G[{zz}, 1])] 
-
-(*
-tailmove[G[{x_}, z_], var_, FitValues_ : {}] := 
- With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
- If[FreeQ[x, var], G[{x}, z], 
-   With[{hh = islinearreducible[1 - z/x, var]}, 
-    If[hh[[1]], 
-     With[{jj = 
-        Expand[linearfactorize[1 - z/x, 
-           var] //. {mylog[aa_ + bb_. var] :> 
-            G[{-(aa/bb)}, var] + mylog[aa], 
-           mylog[var] -> G[{0}, var]}]}, 
-      If[Variables[z/x /.nonvarFitValues/.var->10^-80] =!= {}, jj, 
-         jj - Rationalize[
-          N[(jj - Log[1 - z/x])/(Pi I) //. {G[{0}, yy_] :> Log[yy],
-               G[{aa_}, yy_] /; aa =!= 0 :> Log[1 - yy/aa], 
-              mylog -> Log} //. Rationalize[Append[nonvarFitValues,var->10^-80], 0], 1000], 
-          0] (Pi I)]], Message[MoveVarofG::notlinearred, 1 - z/x]; 
-     Abort[];]]] /. {G[{}, _] :> 1}]
-*)
-
 MoveVarofG::notlinearred = "`1` is not linear reducible!";
 
-preMoveVar[G[z_, y_], var_, FitValues_ : {}] := Which[
-  FreeQ[{z, y}, var] || y === var && FreeQ[z, var], G[z, y],
-  y === 0, 0,
-  MatchQ[z, {0 ..}] && ! FreeQ[y, var] && y =!= var,
-  (Length[z]!)^(-1) (G[{1/(1 - y)}, 1])^Length[z],
-  ! MatchQ[z, {0 ..}] && Last[z] === 0 && (! FreeQ[y, var]) && 
-   y =!= var,
-  Expand[With[{kk = tailzero[z], len = Length[z]}, 
-    1/kk (G[{0}, y] G[Most[z], y] - 
-       Sum[G[Join[z[[1 ;; m]], {0}, 
-          z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
-          ConstantArray[0, kk - 1]], y], {m, 0, len - kk - 1}])]],
-  (! FreeQ[z, var]) && FreeQ[y, var],
-  MoveVarofG[G[z, y], var, FitValues],
-  Last[z] =!= 
-    0 && (((! FreeQ[z, var]) && ! FreeQ[y, var]) || (! FreeQ[y, var] &&
-        y =!= var)),
-  MoveVarofG[G[z/y, 1], var, FitValues]]
+ddG[y_, z_, var_] := 
+ If[Length[y] === 1, 
+     dlog[First[y] - z] - 
+      dlog[First[y]], -dlog[Last[y]] G[Most[y], z] + 
+      dlog[z - First[y]] G[Rest[y], z] + 
+      Sum[dlog[
+         y[[i]] - y[[i + 1]]] (G[Delete[y, i + 1], z] - 
+          G[Delete[y, i], z]), {i, 1, Length[y] - 1}]] /. 
+    dlog[xx_] :> Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
+   dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+  dlog[xx_ /; PolynomialQ[xx, var]] :> 
+   dlog[xx/Coefficient[xx, var^Exponent[xx, var]]]
 
-MoveVar[x_, var_, FitValues_ : {}] := 
- Expand[x /. {G[z_, y_] /; 
-      Length[z] > 1 :> (preMoveVar[G[z, y], var, FitValues] /. 
-       G[zz_, var] :> 
-        revertallbranchG[{#, -1} & /@ zz, var, var, FitValues]), 
-    G[z_, y_] /; 
-      Length[z] == 
-       1 :> (If[
-         Variables[{z, y} /. FitValues] === {}, # + 
-          Pi I Rationalize[(numG[z /. FitValues, 
-                  y /. FitValues] - # /. FitValues /. 
-               G -> numG)/(Pi I), 0], #] &[
-       preMoveVar[G[z, y], var, FitValues]])}]
+premoveG[GdG[x_, zz_, var_, y_], FitValues_ : {}] := 
+ If[Length[x] === 0, G[y, var], 
+  normGvar0[x/zz, var, FitValues] If[y === {}, 1, G[y, var]] + 
+     With[{hh = Expand[ddG[x, zz, var]]}, 
+      With[{jj = 
+         Select[(Union@Cases[hh, _dlog, Infinity] /. 
+            dlog -> 
+             Identity), ! (PolynomialQ[#, var] && 
+              Exponent[#, var] === 1) &]}, 
+       If[Length[jj] > 0, 
+        Message[MoveVarofG::notlinearred, First[jj]]; Abort[];, 
+        hh]]] /. G[z_, zz] dlog[pp_] :> 
+     premoveG[GdG[z, zz, var, Append[y, -pp /. var -> 0]], 
+      FitValues] /. 
+   dlog[pp_] :> 
+    premoveG[GdG[{}, zz, var, Append[y, -pp /. var -> 0]], FitValues]]
 
-preautoGint[x_, var_, FitValues_ : {}] := 
+MoveVarofG[G[x_, z_], var_, FitValues_ : {}] := 
+ Which[z === 0, 0, True, premoveG[GdG[x, z, var, {}], FitValues]]
+
+revbranch[G[x_, var_], FitValues_ : {}] := 
+ With[{revbranchx = 
+     Which[(! NumberQ[var /. FitValues]) || (! 
+           NumberQ[# /. FitValues]), {#, 1}, ! 
+         Element[# /. FitValues, Reals], {#, 1}, (0 < # < var) /. 
+         FitValues, {#, -1}, True, {#, 1}] & /@ x}, 
+   branchG[revbranchx, var, FitValues]] //. 
+  G[pp_, qq_ /; ! FreeQ[qq, var] && qq =!= var && 
+      D[qq, var] === 1] :> (preMoveVar[G[pp, qq], var, FitValues])
+
+preMoveVar[G[z_, var_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
+ G[z, var]
+ 
+preMoveVar[G[z_, y_], var_, FitValues_ : {}] /; ! (FreeQ[z, var] && 
+     y === var) := (Which[
+      FreeQ[{z, y}, var] || y === var && FreeQ[z, var], G[z, y], 
+      y === 0, 0, 
+      MatchQ[z, {0 ..}] && ! FreeQ[y, var] && 
+       y =!= var, (Length[z]!)^(-1) (G[{1/(1 - y)}, 1])^Length[z], 
+      ! MatchQ[z, {0 ..}] && Last[z] === 0 && (! FreeQ[y, var]) && y =!= var, 
+      Expand[With[{kk = tailzero[z], len = Length[z]}, 
+        1/kk (G[{0}, y] G[Most[z], y] - 
+           Sum[G[Join[z[[1 ;; m]], {0}, 
+              z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
+              ConstantArray[0, kk - 1]], y], {m, 0, 
+             len - kk - 1}])]], (! FreeQ[z, var]) && FreeQ[y, var], 
+      MoveVarofG[G[z, y], var, FitValues], 
+      Last[z] =!= 
+        0 && (((! FreeQ[z, var]) && ! FreeQ[y, var]) || (! 
+            FreeQ[y, var] && y =!= var)), 
+      MoveVarofG[G[z/y, 1], var, FitValues]]) /. 
+    G[x_, var] :> revbranch[G[x, var], FitValues] /. 
+   G[{xx_, xxx___}, 
+     xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
+      myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 
+   G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
+
+MoveVar[exp_, var_, FitValues_ : {}] := 
+ exp //. G[xx_, zz_] /; ! FreeQ[{xx, zz}, var] :> 
+   preMoveVar[G[xx, zz], var, FitValues]
+
+combGvar[x_, var_] := 
  FixedPoint[
-  Expand[# //. 
-     {G[xx_, var] G[yy_, var] :> 
-      Total[G[#, var] & /@ Shuffle[xx, yy]],
-      G[{xx_}, var]^k_Integer /; k>1 :> 
-      k! G[ConstantArray[xx,k],var]}] &, 
-  MoveVar[x, var, FitValues]]
+  Expand[# //. {G[xx_, var] G[yy_, var] :> 
+       Total[G[#, var] & /@ Shuffle[xx, yy]], 
+      G[xx_, var]^k_Integer /; k > 1 :> 
+       G[xx, var]^(k - 2) Total[G[#, var] & /@ Shuffle[xx, xx]]}] &, 
+  x]
 
 GIntegrate::notlinearred = "`1` is not linear reducible!";
 preGIntegrate[x_, var_] /; FreeQ[x, var] := x var
@@ -445,23 +470,36 @@ preGIntegrate[c_ x_, var_] /; FreeQ[c, var] := c preGIntegrate[x, var]
 preGIntegrate[x_ + y_, var_] := 
  preGIntegrate[x, var] + preGIntegrate[y, var]
 preGIntegrate[dlog[x_] G[y_, var_], var_] := 
- With[{hh = islinearreducible[x, var]}, 
-  If[First[hh], 
-   Expand[(Total[#[[2]] dlog[#[[1]]] & /@ Last[hh]] /. 
-         dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
-        dlog[aa_. var + bb_.] :> dlog[var + bb/aa]) G[y, var]] /. 
-    dlog[var + aa_.] G[y, var] :> G[Prepend[y, -aa], var], 
-   Message[GIntegrate::notlinearred, x];]]
+ With[{hh = 
+     Expand[G[y, 
+        var] (Total[#[[2]] dlog[#[[1]]] & /@ FactorList[x]] /. 
+          dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+         dlog[xx_ /; PolynomialQ[xx, var]] :> 
+          dlog[xx/Coefficient[xx, var^Exponent[xx, var]]])]}, 
+   With[{jj = 
+      Select[(Union@Cases[hh, _dlog, Infinity] /. 
+         dlog -> Identity), ! (PolynomialQ[#, var] && 
+           Exponent[#, var] === 1) &]}, 
+    If[Length[jj] > 0, Message[GIntegrate::notlinearred, First[jj]];
+     Abort[];, hh]]] /. 
+  dlog[xx_] G[yy_, var] :> G[Prepend[yy, -xx /. var -> 0], var]
 preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
 
 GIntegrate[x_, var_, FitValues_ : {}] := 
- preGIntegrate[preautoGint[x, var, FitValues], var]
+ preGIntegrate[combGvar[MoveVar[x, var, FitValues], var], var]
 
 (* the integral is assumed to be converged *)
 GIntegrate[x_, {var_, a_, b_}, FitValues_ : {}] := 
  With[{nonvarFitValues = DeleteCases[FitValues, var -> _]}, 
-  With[{hh = 
-      preGIntegrate[
-       preautoGint[x, var, Join[nonvarFitValues, {var -> 10^-80}]], 
-       var]}, (hh /. var -> b) - (hh /. var -> a)] /. 
-   G[zz_, Infinity] :> regGinf[G[zz, Infinity]]]
+    With[{hh1 = 
+        GIntegrate[x, var, 
+         Join[nonvarFitValues, {var -> (a /. FitValues) + 10^-10}]], 
+       hh2 = GIntegrate[x, var, 
+         Join[nonvarFitValues, {var -> 
+            If[b === Infinity, 10^10, (b /. FitValues) - 10^-10]}]]},
+      (hh2 /. var -> b) - (hh1 /. var -> a)] /. 
+     G[zz_, Infinity] :> regGinf[G[zz, Infinity]]] /. 
+   G[{xx_, xxx___}, 
+     xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
+      myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 
+   G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
