@@ -1,6 +1,6 @@
 (* ::Package:: *)
 
-Get["MPLdata`"];
+(* Get["MPLdata`"]; *)
 
 (* basic functions*)
 shorthand[vec_]:=Block[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
@@ -56,6 +56,8 @@ generateGtosymbol[
      slowGtoSymbol[
       G[Table[ToExpression["$a" <> ToString[i]], {i, 
          weight}], $zz]]]) /. Rule -> RuleDelayed
+
+$tosymbolGstored = {4, Table[generateGtosymbol[i], {i, 4}]};
 
 removetailzero[anyG[z_, y_]] := 
  Which[z === {}, 1, Last[z] === 0, 
@@ -433,20 +435,15 @@ preMoveVar[G[z_, y_], var_, FitValues_ : {}] /; ! (FreeQ[z, var] &&
      y === var) := (Which[
       FreeQ[{z, y}, var] || y === var && FreeQ[z, var], G[z, y], 
       y === 0, 0, 
-      MatchQ[z, {0 ..}] && ! FreeQ[y, var] && 
-       y =!= var, (Length[z]!)^(-1) (G[{1/(1 - y)}, 1])^Length[z], 
-      ! MatchQ[z, {0 ..}] && Last[z] === 0 && (! FreeQ[y, var]) && y =!= var, 
+      MatchQ[z, {0 ..}], (Length[z]!)^(-1) (G[{1/(1 - y)}, 1])^Length[z], 
+      ! MatchQ[z, {0 ..}] && Last[z] === 0, 
       Expand[With[{kk = tailzero[z], len = Length[z]}, 
         1/kk (G[{0}, y] G[Most[z], y] - 
            Sum[G[Join[z[[1 ;; m]], {0}, 
               z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
               ConstantArray[0, kk - 1]], y], {m, 0, 
-             len - kk - 1}])]], (! FreeQ[z, var]) && FreeQ[y, var], 
-      MoveVarofG[G[z, y], var, FitValues], 
-      Last[z] =!= 
-        0 && (((! FreeQ[z, var]) && ! FreeQ[y, var]) || (! 
-            FreeQ[y, var] && y =!= var)), 
-      MoveVarofG[G[z/y, 1], var, FitValues]]) /. 
+             len - kk - 1}])]], True, 
+      MoveVarofG[G[z, y], var, FitValues]]) /. 
    G[{xx_, xxx___}, 
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 

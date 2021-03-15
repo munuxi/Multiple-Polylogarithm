@@ -133,7 +133,6 @@ Out[11]= 0.*10^-98+0.*10^-98 I
 
 One-dimensional integrals are simply done by `GIntegrate`:
 ```Mathematica
-
 In[12]:= temp = 1/3 Pi^2 G[{w/v}, 1] + G[{-1}, v] G[{0}, w] G[{w/v}, 1] - 
                 G[{0}, v] G[{0}, w] G[{w/v}, 1] + G[{w/v}, 1] G[{-1, 0}, v] - 
                 G[{w/v}, 1] G[{0, -1}, v] + G[{0}, v] G[{0, -w}, 1] + 
@@ -170,6 +169,8 @@ Out[15]= -2.24909
 
 ## Notes
 
+### Performance
+
 It's not a very efficient realization. We could calculate some examples by Ginac (via Ginsh) as a comparison. 
 
 Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh on WSL 1. They use the same CPU (i7-8700). Ginsh will take a short time on IO.
@@ -181,6 +182,28 @@ Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh o
 
 It's much slower when there're non-rational numbers, but Ginac doesn't care it. It's really important to speed up the sum of lots of float numbers for the series calculation.
 It's also possible to speed up recursions. For example, `MPLG[{1, 2, 3, 4, 5}, 6, 100]` and `MPLG[{1, 2, 3, 4, 5}, 7, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
+
+### Cross the Branch Cut
+
+In our realization of `MoveVar`, we consider the choice of branch by assuming the variable t to be a positive number with a infinitesimal negative imaginary part. If `t-i0 -> t+i0` doesn't cross the branch cut of the function, the result of `MoveVar` doesn't care about the infinitesimal imaginary part. Otherwise, the result of `MoveVar` is on the `t-i0` side. For example, 
+```Mathematica
+In[16]:= MoveVar[G[{t}, 2], t]
+
+Out[16]= -G[{0}, t] - G[{2/3}, 1] + G[{2}, t]
+
+In[17]:= %16 /. t -> (1/10) /. G -> MPLG // N
+
+Out[17]= 2.94444 - 3.14159 I
+
+In[18]:= G[{t}, 2] /. t -> (1/10) /. G -> MPLG // N
+
+Out[18]= 2.94444 + 3.14159 I
+
+In[19]:= G[{t}, 2] /. t -> (1/10-10^-50I) /. G -> MPLG // N
+
+Out[19]= 2.94444 - 3.14159 I
+```
+It's not wrong and rare in practice, but also annoying if someone doesn't notice it.
 
 ## Related Packages
 
