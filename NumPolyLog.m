@@ -157,6 +157,16 @@ numLi[m_, x_, prec_ : 50] := N[(-1)^Length[m] MPLG[longhand[m, Rest[FoldList[#1/
 numMZV[m_, prec_ : 50] := numLi[m, ConstantArray[1, Length[m]], prec]
 
 (*
+branchMPLG[z_, y_] := With[{lp = lastpos[z, {_, -1}]},
+  If[lp === 0, MPLG[First /@ z, y],
+   branchMPLG[ReplacePart[z, lp -> z[[lp]] {1, -1}], y] - 
+    2 Pi I MPLG[First /@ z[[lp + 1 ;;]], 
+      First[z[[lp]]]] branchMPLG[{#[[1]] - First[z[[lp]]], 
+         If[(#[[2]] === -1) && (#[[1]] <= First[z[[lp]]]), 
+          1, #[[2]]]} & /@ z[[;; lp - 1]], y - First[z[[lp]]]]]]
+*)
+
+(*
 TODO : Be careful!!!! Check!!!! Rename functions!!! 
 *)
 
@@ -179,25 +189,22 @@ and (from the definition of G function)
                                     = dlog(z-a1)G({a2,...,an},z)+...+
                                       dlog(ai-ai+1)G({a1,...,\hat{ai+1},...,an},z)-
                                       dlog(ai-ai+1)G({a1,...,\hat{ai},...,an},z)+...+
-                                      -dlog(an)G({a1,...,an-1},z),
+                                      -dlog(an)G({a1,...,an-1},z),    ........... (1)
 Finally, we reduce it to 
     G({an},z) = log(1-z/an) = log(c) + sum_i n_i log(1-t/c_i) 
-                            = log(c) + sum_i n_i G(ci,t), ...................... (1)
+                            = log(c) + sum_i n_i G(ci,t), 
 and then we can calculate all remaining integral 
     int dlog(t1-b1)dlog(t2-b1)...dlog(t(n-1)-b(n-1))G(ci,t) = G({b1,...,b(n-1),ci},t)
 from the definition of G function. 
 
 However, G({a1(0),...,an(0)},z) usually diverges when a1(0)=1 or an(0)=0, we use the 
 shuffle regularization used in [1403.3385] to get the finite result. On the other hand,
-eq.(1) usually depands on the branch you choice, otherwise we can only get a 
-funtion with the same symbol. The other steps are all algebraic, so if (1) is correct 
-(on a given region), the whole reduction is correct (on the given region). In our 
-realization, one could add fitting values to support numerical checks of eq.(1) 
+the integration of eq.(1) usually depands on the branch you choice, otherwise we can 
+only get a funtion with the same symbol. The other steps are all algebraic, so if (1) 
+is correct (on a given region), the whole reduction is correct (on the given region). 
+In our realization, one could add fitting values to support numerical checks of eq.(1) 
 in the recursion, otherwise it will not check (1).
 *)
-
-
-Off[N::meprec]
 
 (* shuffle regularization *)
 
@@ -276,7 +283,8 @@ preregGinf[z_] := If[z === 0, 0,
 regGinf[G[z_, Infinity]] := specialmobiustrans[myword @@ z]
 
 regGallnear0[z_] := 
- preregGinf[z] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]
+ preregGinf[z] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]] /. 
+  G[zz_, 1] :> (-1)^Length[zz] G[Reverse[1 - zz], 1]
 
 regGallnear1[z_] :=
   (-1)^Length[z] preregGinf[Reverse@z] /. 
@@ -287,16 +295,7 @@ lastpos[list_, pat_] :=
  With[{hh = FirstPosition[Reverse[list], pat]}, 
   If[hh === Missing["NotFound"], 0, 1 + Length[list] - First@hh]]
 
-(*
-branchMPLG[z_, y_] := With[{lp = lastpos[z, {_, -1}]},
-  If[lp === 0, MPLG[First /@ z, y],
-   branchMPLG[ReplacePart[z, lp -> z[[lp]] {1, -1}], y] - 
-    2 Pi I MPLG[First /@ z[[lp + 1 ;;]], 
-      First[z[[lp]]]] branchMPLG[{#[[1]] - First[z[[lp]]], 
-         If[(#[[2]] === -1) && (#[[1]] <= First[z[[lp]]]), 
-          1, #[[2]]]} & /@ z[[;; lp - 1]], y - First[z[[lp]]]]]]
-*)
-
+(* we assume that t>0 and t=t-i0 such that G({a..},t-i0)=G({a..},t) *)
 branchlead[func_, var_, range_, FitValues_ : {}] := 
  With[{nonvarFitValues = DeleteCases[FitValues, var -> _], 
    md = minideg[func /. DeleteCases[FitValues, var -> _], var]},
@@ -310,7 +309,7 @@ branchlead[func_, var_, range_, FitValues_ : {}] :=
     md == 0 && ! (First[range] < numlead < Last[range]), {0, lead, 1},
     md == 0 && First[range] < numlead < Last[range],
     With[{subdeglead = deglead[func - lead /. nonvarFitValues, var]},
-     {0, lead, If[Last[subdeglead] >= 0, 1, -1]}],
+     {0, lead, If[Last[subdeglead] <= 0, 1, -1]}],
     True, {md, lead, 1}
     ]]]
 
@@ -415,6 +414,7 @@ premoveG[GdG[x_, zz_, var_, y_], FitValues_ : {}] :=
 MoveVarofG[G[x_, z_], var_, FitValues_ : {}] := 
  Which[z === 0, 0, True, premoveG[GdG[x, z, var, {}], FitValues]]
 
+(*
 revbranch[G[x_, var_], FitValues_ : {}] := 
  With[{revbranchx = 
      Which[(! NumberQ[var /. FitValues]) || (! 
@@ -424,6 +424,7 @@ revbranch[G[x_, var_], FitValues_ : {}] :=
    branchG[revbranchx, var, FitValues]] //. 
   G[pp_, qq_ /; ! FreeQ[qq, var] && qq =!= var && 
       D[qq, var] === 1] :> (preMoveVar[G[pp, qq], var, FitValues])
+*)
 
 preMoveVar[G[z_, var_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
  G[z, var]
@@ -446,7 +447,6 @@ preMoveVar[G[z_, y_], var_, FitValues_ : {}] /; ! (FreeQ[z, var] &&
         0 && (((! FreeQ[z, var]) && ! FreeQ[y, var]) || (! 
             FreeQ[y, var] && y =!= var)), 
       MoveVarofG[G[z/y, 1], var, FitValues]]) /. 
-    G[x_, var] :> revbranch[G[x, var], FitValues] /. 
    G[{xx_, xxx___}, 
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 

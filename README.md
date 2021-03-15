@@ -180,7 +180,7 @@ Platform: Mathematica (12.1.1.0) on Windows 10 x86-64 (Build 20201), and Ginsh o
 - `N[MPLG[{1, 2, 3, 4, 5, 6, 7}, 8], 100]` will take ~10s, and Ginac will take ~40s
 
 It's much slower when there're non-rational numbers, but Ginac doesn't care it. It's really important to speed up the sum of lots of float numbers for the series calculation.
-It's also possible to speed up recursions. For example, `MPLG[{1, 2, 3, 4, 5}, 6, 100]` and `MPLG[{1, 2, 3, 4, 5}, 6, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
+It's also possible to speed up recursions. For example, `MPLG[{1, 2, 3, 4, 5}, 6, 100]` and `MPLG[{1, 2, 3, 4, 5}, 7, 100]` share the same recursions (with different numbers), so a more efficient code should learn to recognize it.
 
 ## Related Packages
 
