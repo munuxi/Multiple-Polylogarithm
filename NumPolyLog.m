@@ -133,7 +133,7 @@ goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-PolyLog[Length[z],1/Last[z]];
 accG[{z_},prec_:50]:=Log[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
 accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
-(* defind MPLG *)
+(* define MPLG *)
 SetAttributes[MPLG, NumericFunction]
 MPLG[{}, _]  := 1
 MPLG[z_, 0] /; (! MatchQ[z, {0 ..}]) := 0
@@ -360,7 +360,7 @@ normGvar0[z_, var_, FitValues_ : {}] :=
     1, FitValues], (* be careful *)
    Limit[Last[z] /. nonvarFitValues, var -> 0] === 0, 
    With[{hh = 
-      tailzero[Rationalize@Chop[Limit[z /. nonvarFitValues,var -> 0]]]}, 
+      tailzero[Rationalize@Chop[Simplify[z /. nonvarFitValues] /. var -> 0]]}, 
     With[{kk = 
        regGallnear0[
         Most[branchlead[#, var, {0, 1}, FitValues]] & /@ 
@@ -370,7 +370,7 @@ normGvar0[z_, var_, FitValues_ : {}] :=
          Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]],
    Limit[First[z] /. nonvarFitValues, var -> 0] === 1, 
    With[{hh = 
-      headone[Rationalize@Chop[z /. nonvarFitValues /. var -> 0]]}, 
+      headone[Rationalize@Chop[Simplify[z /. nonvarFitValues] /. var -> 0]]}, 
     With[{kk = 
        regGallnear1[
         Most[branchlead[#, var, {0, 1}, FitValues]] & /@ (1 - 

@@ -165,7 +165,7 @@ In[15]:= result /. {v -> 1/10, w -> 1/20} /. G -> MPLG // N
 
 Out[15]= -2.24909
 ```
-(The above example comes form the calculation of a 2D double-pendtagon integral.)
+(The above example comes form the calculation of a 2D double-pentagon integral.)
 
 ## Notes
 
