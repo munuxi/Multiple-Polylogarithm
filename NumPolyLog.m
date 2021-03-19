@@ -3,16 +3,16 @@
 (* Get["MPLdata`"]; *)
 
 (* basic functions*)
-shorthand[vec_]:=Block[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
+shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
 readfirstnotinpos[list_,sublist_,direction_]:=Which[direction===1,If[Length[list]>0&&MemberQ[sublist,First[list]],readfirstnotinpos[Rest[list],sublist,direction]+1,0],direction===-1,If[Length[list]>0&&MemberQ[sublist,Last[list]],readfirstnotinpos[Most[list],sublist,direction]+1,0],True,0]
 tailzero[list_]:=readfirstnotinpos[list,{0},-1]
 headone[list_]:=readfirstnotinpos[list,{1},1]
 Shuffle[{},{}]:={}
-Shuffle[s1_,s2_]:=Block[{p,tp,ord},p=Transpose[Permutations[Join[(1&)/@s1,(0&)/@s2]]];tp=BitXor[p,1];ord=Accumulate[p] p+(Accumulate[tp]+Length[s1]) tp;Transpose[Outer[Part,{Join[s1,s2]},ord,1][[1]]]]
+Shuffle[s1_,s2_]:=With[{p=Transpose[Permutations[Join[(1&)/@s1,(0&)/@s2]]]},With[{tp=BitXor[p,1]},Transpose[First@Outer[Part,{Join[s1,s2]},Accumulate[p] p+(Accumulate[tp]+Length[s1]) tp,1]]]]
 Shufflep[_,{}]:={}
 Shufflep[{},_]:={}
-Shufflep[s1_,s2_]:=Block[{p,tp,ord},p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]];tp=BitXor[p,1];ord=Accumulate[p] p+(Accumulate[tp]+Length[s1]) tp;Transpose[Outer[Part,{Join[s1,s2]},ord,1][[1]]]]
+Shufflep[s1_,s2_]:=With[{p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]]},With[{tp=BitXor[p,1]},Transpose[First@Outer[Part,{Join[s1,s2]},Accumulate[p] p+(Accumulate[tp]+Length[s1]) tp,1]]]]
 (*minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,If[Limit[f,var->0]===0,minideg[f/var,var]+1,0]];*)
 minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]===0,-minideg[1/f,var],Chop@Limit[f,var->0]===0,minideg[f/var,var]+1,True,0]]
 deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
@@ -383,7 +383,7 @@ normGvar0[z_, var_, FitValues_ : {}] :=
 
 MoveVarofG::notlinearred = "`1` is not linear reducible!";
 
-ddG[y_, z_, var_] := 
+ddG[y_, z_, var_] := ddG[y, z, var] = 
  If[Length[y] === 1, 
      dlog[First[y] - z] - 
       dlog[First[y]], -dlog[Last[y]] G[Most[y], z] + 
