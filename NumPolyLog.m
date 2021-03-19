@@ -298,45 +298,44 @@ lastpos[list_, pat_] :=
   If[hh === Missing["NotFound"], 0, 1 + Length[list] - First@hh]]
 
 (* we assume that t>0 and t=t-i0 such that G({a..},t-i0)=G({a..},t) *)
-branchlead[func_, var_, range_, FitValues_ : {}] := 
- With[{nonvarFitValues = DeleteCases[FitValues, var -> _], 
-   md = minideg[func /. DeleteCases[FitValues, var -> _], var]},
+BranchLead[func_, var_, range_, OptionsPattern[{"FitValue"->{}}]] := 
+ With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _], 
+   md = minideg[func /. DeleteCases[OptionValue["FitValue"], var -> _], var]},
   With[{lead = SeriesCoefficient[func, {var, 0, md}], 
     numlead = 
-     SeriesCoefficient[func /. nonvarFitValues, {var, 0, md}]},
+     SeriesCoefficient[func /. nonvarFitValue, {var, 0, md}]},
    Which[
     FreeQ[func, var], {0, func, 1},
     ! NumberQ[numlead], {0, lead, 1},
     md == 0 && ! Element[numlead, Reals], {0, lead, 1},
     md == 0 && ! (First[range] < numlead < Last[range]), {0, lead, 1},
     md == 0 && First[range] < numlead < Last[range],
-    With[{subdeglead = deglead[func - lead /. nonvarFitValues, var]},
+    With[{subdeglead = deglead[func - lead /. nonvarFitValue, var]},
      {0, lead, If[Last[subdeglead] <= 0, 1, -1]}],
     True, {md, lead, 1}
     ]]]
 
-branchG[z_, y_, FitValues_ : {}] := With[{lp = lastpos[z, {_, -1}]},
-  If[lp === 0, G[First /@ z, y] /. G[{}, _] :> 1,
-   branchG[ReplacePart[z, lp -> z[[lp]] {1, -1}], y, FitValues] - 
+branchG[z_, y_, opts : OptionsPattern[{"FitValue"->{}}]] := 
+ With[{lp = lastpos[z, {_, -1}]}, 
+  If[lp === 0, G[First /@ z, y] /. G[{}, _] :> 1, 
+   branchG[ReplacePart[z, lp -> z[[lp]] {1, -1}], y, opts] - 
     2 Pi I If[z[[lp + 1 ;;]] === {}, 1, 
       regwordabove[
         myword @@ (First /@ z[[lp + 1 ;;]]), {First[z[[lp]]]}] /. 
        myword[x__] :> 
-        G[{x}, First[z[[lp]]]]] branchG[{#[[1]] - First[z[[lp]]],
-         Which[! NumberQ[(First[z[[lp]]] - #[[1]]) /. FitValues],
-          1,
-          ! Element[(First[z[[lp]]] - #[[1]]) /. FitValues, Reals],
-          1,
-          (#[[2]] === -1) && ((First[z[[lp]]] - #[[1]] /. 
-               FitValues) >= 0), 1,
-          True, #[[2]]]} & /@ z[[;; lp - 1]], y - First[z[[lp]]], 
-      FitValues]]]
+        G[{x}, First[z[[lp]]]]] branchG[{#[[1]] - First[z[[lp]]], 
+         Which[
+           ! NumberQ[(First[z[[lp]]] - #[[1]]) /. OptionValue["FitValue"]], 1, 
+           ! Element[(First[z[[lp]]] - #[[1]]) /. OptionValue["FitValue"], Reals], 1, 
+           (#[[2]] === -1) && ((First[z[[lp]]] - #[[1]] /. OptionValue["FitValue"]) >= 0), 1,
+          True, #[[2]]]} & /@ 
+       z[[;; lp - 1]], y - First[z[[lp]]], opts]]]
 
-normGvar0[z_, var_, FitValues_ : {}] := 
- With[{nonvarFitValues = DeleteCases[FitValues, var -> _]},
+normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
+ With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
   Which[
    z === {}, 1,
-   AnyTrue[DeleteCases[z /. nonvarFitValues, 0], 
+   AnyTrue[DeleteCases[z /. nonvarFitValue, 0], 
     Limit[1/#, var -> 0] === 0 &], 0,
    Last[z] === 0, 
    Expand[With[{kk = tailzero[z], len = Length[z]}, 
@@ -344,7 +343,7 @@ normGvar0[z_, var_, FitValues_ : {}] :=
          normGvar0[
           Join[z[[1 ;; m]], {0}, 
            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
-           ConstantArray[0, kk - 1]], var, FitValues], {m, 0, 
+           ConstantArray[0, kk - 1]], var, opts], {m, 0, 
           len - kk - 1}])]],
    First[z] === 1, 
    Expand[With[{kk = headone[z], len = Length[z]}, 
@@ -352,31 +351,31 @@ normGvar0[z_, var_, FitValues_ : {}] :=
       1/kk (-Sum[
           normGvar0[
            Join[ConstantArray[1, kk - 1], z[[kk + 1 ;; m]], {1}, 
-            z[[m + 1 ;;]]], var, FitValues], {m, kk + 1, len}])]]],
-   Limit[First[z] /. nonvarFitValues, var -> 0] =!= 1 && 
-    Limit[Last[z] /. nonvarFitValues, var -> 0] =!= 0, 
+            z[[m + 1 ;;]]], var, opts], {m, kk + 1, len}])]]],
+   Limit[First[z] /. nonvarFitValue, var -> 0] =!= 1 && 
+    Limit[Last[z] /. nonvarFitValue, var -> 0] =!= 0, 
    branchG[If[#[[1]] > 0, {0, 1}, 
-       Rest[#]] & /@ (branchlead[#, var, {0, 1}, FitValues] & /@ z), 
-    1, FitValues], (* be careful *)
-   Limit[Last[z] /. nonvarFitValues, var -> 0] === 0, 
+       Rest[#]] & /@ (BranchLead[#, var, {0, 1}, opts] & /@ z), 
+    1, opts], (* be careful *)
+   Limit[Last[z] /. nonvarFitValue, var -> 0] === 0, 
    With[{hh = 
-      tailzero[Rationalize@Chop[Simplify[z /. nonvarFitValues] /. var -> 0]]}, 
+      tailzero[Rationalize@Chop[Simplify[z /. nonvarFitValue] /. var -> 0]]}, 
     With[{kk = 
        regGallnear0[
-        Most[branchlead[#, var, {0, 1}, FitValues]] & /@ 
+        Most[BranchLead[#, var, {0, 1}, opts]] & /@ 
          z[[-hh ;;]]]}, 
-     kk normGvar0[z[[;; -hh - 1]], var, FitValues] - 
-      Total[(normGvar0[#, var, FitValues] & /@ 
+     kk normGvar0[z[[;; -hh - 1]], var, opts] - 
+      Total[(normGvar0[#, var, opts] & /@ 
          Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]],
-   Limit[First[z] /. nonvarFitValues, var -> 0] === 1, 
+   Limit[First[z] /. nonvarFitValue, var -> 0] === 1, 
    With[{hh = 
-      headone[Rationalize@Chop[Simplify[z /. nonvarFitValues] /. var -> 0]]}, 
+      headone[Rationalize@Chop[Simplify[z /. nonvarFitValue] /. var -> 0]]}, 
     With[{kk = 
        regGallnear1[
-        Most[branchlead[#, var, {0, 1}, FitValues]] & /@ (1 - 
+        Most[BranchLead[#, var, {0, 1}, opts]] & /@ (1 - 
            z[[;; hh]])]}, 
-     kk normGvar0[z[[hh + 1 ;;]], var, FitValues] - 
-      Total[(normGvar0[#, var, FitValues] & /@ 
+     kk normGvar0[z[[hh + 1 ;;]], var, opts] - 
+      Total[(normGvar0[#, var, opts] & /@ 
          Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]]]]]
 
 (* Newton-Leibniz reduction *)
@@ -396,9 +395,9 @@ ddG[y_, z_, var_] := ddG[y, z, var] =
   dlog[xx_ /; PolynomialQ[xx, var]] :> 
    dlog[xx/Coefficient[xx, var^Exponent[xx, var]]]
 
-premoveG[GdG[x_, zz_, var_, y_], FitValues_ : {}] := 
+premoveG[GdG[x_, zz_, var_, y_], opts : OptionsPattern[{"FitValue"->{}}]] := 
  If[Length[x] === 0, G[y, var], 
-  normGvar0[x/zz, var, FitValues] If[y === {}, 1, G[y, var]] + 
+  normGvar0[x/zz, var, opts] If[y === {}, 1, G[y, var]] + 
      With[{hh = Expand[ddG[x, zz, var]]}, 
       With[{jj = 
          Select[(Union@Cases[hh, _dlog, Infinity] /. 
@@ -409,29 +408,29 @@ premoveG[GdG[x_, zz_, var_, y_], FitValues_ : {}] :=
         Message[MoveVarofG::notlinearred, First[jj]]; Abort[];, 
         hh]]] /. G[z_, zz] dlog[pp_] :> 
      premoveG[GdG[z, zz, var, Append[y, -pp /. var -> 0]], 
-      FitValues] /. 
+      opts] /. 
    dlog[pp_] :> 
-    premoveG[GdG[{}, zz, var, Append[y, -pp /. var -> 0]], FitValues]]
+    premoveG[GdG[{}, zz, var, Append[y, -pp /. var -> 0]], opts]]
 
-MoveVarofG[G[x_, z_], var_, FitValues_ : {}] := 
- Which[z === 0, 0, True, premoveG[GdG[x, z, var, {}], FitValues]]
+MoveVarofG[G[x_, z_], var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
+ Which[z === 0, 0, True, premoveG[GdG[x, z, var, {}], opts]]
 
 (*
-revbranch[G[x_, var_], FitValues_ : {}] := 
+revbranch[G[x_, var_], FitValue_ : {}] := 
  With[{revbranchx = 
-     Which[(! NumberQ[var /. FitValues]) || (! 
-           NumberQ[# /. FitValues]), {#, 1}, ! 
-         Element[# /. FitValues, Reals], {#, 1}, (0 < # < var) /. 
-         FitValues, {#, -1}, True, {#, 1}] & /@ x}, 
-   branchG[revbranchx, var, FitValues]] //. 
+     Which[(! NumberQ[var /. FitValue]) || (! 
+           NumberQ[# /. FitValue]), {#, 1}, ! 
+         Element[# /. FitValue, Reals], {#, 1}, (0 < # < var) /. 
+         FitValue, {#, -1}, True, {#, 1}] & /@ x}, 
+   branchG[revbranchx, var, FitValue]] //. 
   G[pp_, qq_ /; ! FreeQ[qq, var] && qq =!= var && 
-      D[qq, var] === 1] :> (preMoveVar[G[pp, qq], var, FitValues])
+      D[qq, var] === 1] :> (preMoveVar[G[pp, qq], var, FitValue])
 *)
 
-preMoveVar[G[z_, var_], var_, FitValues_ : {}] /; FreeQ[z, var] := 
+preMoveVar[G[z_, var_], var_, opts : OptionsPattern[{"FitValue"->{}}]] /; FreeQ[z, var] := 
  G[z, var]
  
-preMoveVar[G[z_, y_], var_, FitValues_ : {}] /; ! (FreeQ[z, var] && 
+preMoveVar[G[z_, y_], var_, opts : OptionsPattern[{"FitValue"->{}}]] /; ! (FreeQ[z, var] && 
      y === var) := (Which[
       FreeQ[{z, y}, var] || y === var && FreeQ[z, var], G[z, y], 
       y === 0, 0, 
@@ -443,15 +442,15 @@ preMoveVar[G[z_, y_], var_, FitValues_ : {}] /; ! (FreeQ[z, var] &&
               z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
               ConstantArray[0, kk - 1]], y], {m, 0, 
              len - kk - 1}])]], True, 
-      MoveVarofG[G[z, y], var, FitValues]]) /. 
+      MoveVarofG[G[z, y], var, opts]]) /. 
    G[{xx_, xxx___}, 
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 
    G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
 
-MoveVar[exp_, var_, FitValues_ : {}] := 
+MoveVar[exp_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
  exp //. G[xx_, zz_] /; ! FreeQ[{xx, zz}, var] :> 
-   preMoveVar[G[xx, zz], var, FitValues]
+   preMoveVar[G[xx, zz], var, opts]
 
 combGvar[x_, var_] := 
  FixedPoint[
@@ -482,20 +481,16 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
   dlog[xx_] G[yy_, var] :> G[Prepend[yy, -xx /. var -> 0], var]
 preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
 
-GIntegrate[x_, var_, FitValues_ : {}] := 
- preGIntegrate[combGvar[MoveVar[x, var, FitValues], var], var]
+GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
+ preGIntegrate[combGvar[MoveVar[x, var, opts], var], var]
 
 (* the integral is assumed to be converged *)
-GIntegrate[x_, {var_, a_, b_}, FitValues_ : {}] := 
- With[{nonvarFitValues = DeleteCases[FitValues, var -> _]}, 
-    With[{hh1 = 
-        GIntegrate[x, var, 
-         Join[nonvarFitValues, {var -> (a /. FitValues) + 10^-10}]], 
-       hh2 = GIntegrate[x, var, 
-         Join[nonvarFitValues, {var -> 
-            If[b === Infinity, 10^10, (b /. FitValues) - 10^-10]}]]},
-      (hh2 /. var -> b) - (hh1 /. var -> a)] /. 
-     G[zz_, Infinity] :> regGinf[G[zz, Infinity]]] /. 
+GIntegrate[x_, {var_, a_, b_}, opts : OptionsPattern[{"FitValue" -> {}}]] := 
+ With[{nonvarFitValue = 
+      DeleteCases[OptionValue["FitValue"], var -> _]}, 
+    With[{hh = 
+        GIntegrate[x, var, opts]}, (hh /. var -> b) - (hh /. 
+         var -> a)] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]] /. 
    G[{xx_, xxx___}, 
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 

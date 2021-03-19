@@ -99,36 +99,31 @@ shuffle regularization used in [1403.3385](https://arxiv.org/abs/1403.3385) to g
 What's more, we can first assume that t is a very small positive number such that 
 the integral will never meet nonzero singularities. After getting the answer, we could
 use analytic continuation to fix the answer in other regions, where one should add 
-fitting values `FitValues` to tell the code the region.
+option fitting values `"FitValue"` to tell the code the region.
 
-In this code, this is done by a function `MoveVar[Gfuncs,var,FitValues]`. 
-`FitValues` are very important for the choice of branches. If there's no `FitValues`, 
+In this code, this is done by a function `MoveVar[Gfuncs,var,"FitValue"->{something}]`. 
+`"FitValue"` are very important for the choice of branches. If there's no `"FitValue"`, 
 one can get a result, but it is usually not correct. For example,
 ```Mathematica
-(* an example with and without FitValues *)
+(* an example with and without FitValue *)
 
-In[8]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t]
+In[8]:= MoveVar[G[{1/2-a t},1],t]
 
-Out[8]= G[{0},t]-G[{0},t] G[{b/(1+b)},1]+G[{1/a},t] G[{b/(1+b)},1]-G[{1/c},t]+
-        G[{1-c/(1+c)},1]+G[{0,0},t]-G[{0,1/b},t]-G[{1/a,0},t]+G[{1/a,1/b},t]-
-        G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+G[{b/(1+b),1},1]
+Out[8]= I Pi+G[{-(1/(2 a))},t]-G[{1/(2 a)},t]
 
-In[9]:= MoveVar[G[{a,b},1/t]+G[{1-c t},1],t,{t->10,c->-2,a->3,b->1/5}]
+In[9]:= MoveVar[G[{1/2-a t},1],t,"FitValue"->{a->-2}]
 
-Out[9]= 2 I Pi G[{0},1/a]-2 I Pi (-2 I Pi+G[{1/a},t]+G[{(a-b)/a},1])-2 I Pi G[{1/b},1/a]-
-        G[{0},t] G[{b/(1+b)},1]+(-2 I Pi+G[{1/a},t]) G[{b/(1+b)},1]+2 I Pi (G[{0},t]+
-        G[{1-b/(-1+b)},1])+G[{0,0},t]-G[{0,1/b},t]-G[{1/a,0},t]+G[{1/a,1/b},t]-
-        G[{a/(1+a),1},1]+G[{a/(1+a),b/(1+b)},1]+G[{b/(1+b),1},1]
+Out[9]= -I Pi+G[{-(1/(2 a))},t]-G[{1/(2 a)},t]
 
 (* check *)
 
-In[10]:= (%8 - (G[{a,b},1/t]+G[{1-c t},1]))/.{t->10,c->-2,a->3,b->1/5}/.G->MPLG//N
+In[10]:= (%8 - G[{1/2-a t},1])/.{t->10,a->-2}/.G->MPLG//N
 
-Out[10]= -19.7392+16.8022 I
+Out[10]= -2.35922*10^-16+6.28319 I
 
-In[11]:= (%9 - (G[{a,b},1/t]+G[{1-c t},1]))/.{t->10,c->-2,a->3,b->1/5}/.G->MPLG//N[#, 50]&
+In[11]:= (%9 - G[{1/2-a t},1])/.{t->10,a->-2}/.G->MPLG//N[#,50]&
 
-Out[11]= 0.*10^-98+0.*10^-98 I
+Out[11]= 0.*10^-99
 ```
 
 One-dimensional integrals are simply done by `GIntegrate`:
@@ -141,7 +136,7 @@ In[12]:= temp = 1/3 Pi^2 G[{w/v}, 1] + G[{-1}, v] G[{0}, w] G[{w/v}, 1] -
                 G[{0}, w] G[{w/v, -w}, 1] + G[{0, 0, -w}, 1] - G[{0, -w, 0}, 1] -
                  G[{w/v, 0, -w}, 1] + G[{w/v, -w, 0}, 1] /. {w -> w, v -> v/t} //
                Simplify;
-         result = GIntegrate[temp dlog[t], {t, 0, 1}, {v -> 1/10, w -> 1/20}]
+         result = GIntegrate[temp dlog[t], {t, 0, 1}, "FitValue"->{v -> 1/10, w -> 1/20}]
 
 Out[13]= G[{0}, w] G[{-w}, 1] G[{0, -v}, 1] + 
          G[{1/(1 - v)}, 1] G[{-w}, 1] G[{0, -v}, 1] + 
