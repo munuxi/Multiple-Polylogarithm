@@ -335,8 +335,7 @@ normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] :=
  With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
   Which[
    z === {}, 1,
-   AnyTrue[DeleteCases[z /. nonvarFitValue, 0], 
-    Limit[1/#, var -> 0] === 0 &], 0,
+   AnyTrue[DeleteCases[z /. nonvarFitValue, 0], Limit[1/#, var -> 0] === 0 &], 0,
    Last[z] === 0 || First[z] === 1,
     regword[myword @@ z, {1}, {0}] /. myword[xx__] :> normGvar0[{xx}, var, opts],
    Limit[First[z] /. nonvarFitValue, var -> 0] =!= 1 && 
@@ -385,6 +384,7 @@ With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
 
 MoveVar::notlinearred = "`1` is not linear reducible!";
 
+(* it's useful for debug 
 ddG[y_, z_, var_] := ddG[y, z, var] = 
  If[Length[y] === 1, 
      dlog[First[y] - z] - 
@@ -397,6 +397,7 @@ ddG[y_, z_, var_] := ddG[y, z, var] =
    dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
   dlog[xx_ /; PolynomialQ[xx, var]] :> 
    dlog[xx/Coefficient[xx, var^Exponent[xx, var]]]
+*)
 
 dlogfactor[exp_, var_] := dlogfactor[exp, var] = 
  With[{hh = exp /. dlog[xx_] :> 
@@ -471,18 +472,19 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
     If[Length[jj] > 0, Message[GIntegrate::notlinearred, First[jj]];
      Abort[];, hh]]] /. 
   dlog[xx_] G[yy_, var] :> G[Prepend[yy, -xx /. var -> 0], var]
-preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
+preGIntegrate[dlog[x_],var_] := G[{-x /. var -> 0}, var]
+
 
 GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
- preGIntegrate[combGvar[MoveVar[x, var, opts], var], var]
+ With[{hh = Expand[combGvar[MoveVar[x, var, opts], var]]}, 
+  If[Head[hh] === Plus, preGIntegrate[#, var] & /@ hh, 
+   preGIntegrate[hh, var]]]
 
 (* the integral is assumed to be converged *)
 GIntegrate[x_, {var_, a_, b_}, opts : OptionsPattern[{"FitValue" -> {}}]] := 
- With[{nonvarFitValue = 
-      DeleteCases[OptionValue["FitValue"], var -> _]}, 
-    With[{hh = 
+  (With[{hh = 
         GIntegrate[x, var, opts]}, (hh /. var -> b) - (hh /. 
-         var -> a)] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]] /. 
+         var -> a)] /. G[zz_, Infinity] :> regGinf[G[zz, Infinity]]) /. 
    G[{xx_, xxx___}, 
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 
