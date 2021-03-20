@@ -472,7 +472,7 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
     If[Length[jj] > 0, Message[GIntegrate::notlinearred, First[jj]];
      Abort[];, hh]]] /. 
   dlog[xx_] G[yy_, var] :> G[Prepend[yy, -xx /. var -> 0], var]
-preGIntegrate[dlog[x_],var_] := G[{-x /. var -> 0}, var]
+preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
 
 
 GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
