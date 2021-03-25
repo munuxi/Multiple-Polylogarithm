@@ -345,7 +345,7 @@ normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] :=
     1, opts], (* be careful *)
    Limit[Last[z] /. nonvarFitValue, var -> 0] === 0, 
    With[{hh = 
-      tailzero[Rationalize@Chop[Simplify[z /. nonvarFitValue] /. var -> 0]]}, 
+      tailzero[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue]] /. var -> 0]]}, 
     With[{kk = 
        regGallnear0[
         Most[BranchLead[#, var, {0, 1}, opts]] & /@ 
@@ -355,7 +355,7 @@ normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] :=
          Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]],
    Limit[First[z] /. nonvarFitValue, var -> 0] === 1, 
    With[{hh = 
-      headone[Rationalize@Chop[Simplify[z /. nonvarFitValue] /. var -> 0]]}, 
+      headone[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue]] /. var -> 0]]}, 
     With[{kk = 
        regGallnear1[
         Most[BranchLead[#, var, {0, 1}, opts]] & /@ (1 - 

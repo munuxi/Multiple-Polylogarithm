@@ -93,7 +93,7 @@ and then we can calculate all remaining integral
 ```
 from the definition of G function. 
 
-However, G({a1(0),...,an(0)},z) usually diverges when a1(0)=1 or an(0)=0, we use the 
+However, G({a1(0),...,an(0)},z) usually diverges when a1(0)=z or an(0)=0, we use the 
 shuffle regularization used in [1403.3385](https://arxiv.org/abs/1403.3385) to get the finite result. 
 
 What's more, we can first assume that t is a very small positive number such that 
@@ -208,4 +208,4 @@ It seems that [Ginac](https://ginac.de/) (in C++) is the only software provides 
 
 For harmonic polylogarithms, [HPL](https://arxiv.org/abs/hep-ph/0507152) is a very useful package in Mathematica.
 
-[HyperInt](https://bitbucket.org/PanzerErik/hyperint/wiki/Home) in Maple is another well-known and powerful package in Feynman integrals calculation and integraltions of polylogarithm, but it cannot do numerical evaluations.
+[HyperInt](https://bitbucket.org/PanzerErik/hyperint/wiki/Home) in Maple is another well-known and powerful package in Feynman integrals calculation and integrations of polylogarithm, but it cannot do numerical evaluations.
