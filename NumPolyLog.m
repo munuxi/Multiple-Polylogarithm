@@ -29,13 +29,64 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 *)
 
 (*some symbol calculation*)
+
 GetAlphabet[x_]:=Cases[x,Tensor[y__]:>y,Infinity]//Union
+(*
 tensor[___,1|-1,___]:=0
 tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
 tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
 expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
 ExpandTensor[exp_]:=expandTensor[exp/.Dispatch[#->Factor[#]&/@GetAlphabet[exp]]/.Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]
+*)
+
+dlogfactor[dlog[xx_]] := 
+ dlogfactor[dlog[xx]] = 
+  With[{hh = FactorList[xx]}, Total[dlog[#[[1]]] #[[2]] & /@ hh] /. 
+    dlog[1 | -1 | 0] -> 0] /. dlog[x_] :> dlog[Last[Sort[{x, -x}]]]
+totalD[x_ + y_] := totalD[x] + totalD[y]
+totalD[x_ y_] := totalD[x] y + totalD[y] x
+totalD[x_^n_Integer] := n x^(n - 1) totalD[x]
+totalD[G[a_, z_]] := 
+ totalD[G[a, z]] = 
+  Sum[G[Delete[a, i], z] Which[Length[a] == 1, 
+       dlog[a[[i]] - z] - dlog[a[[i]] - 0], i == 1, 
+       dlog[a[[i]] - z] - dlog[a[[i]] - a[[i + 1]]], i == Length[a], 
+       dlog[a[[i]] - a[[i - 1]]] - dlog[a[[i]] - 0], True, 
+       dlog[a[[i]] - a[[i - 1]]] - dlog[a[[i]] - a[[i + 1]]]], {i, 
+      Length[a]}] /. dlog[xx_] :> dlogfactor[dlog[xx]] /. G[{}, _] :> 1
+totalD[Tensor[a___, b_]] := 
+ Tensor[a] dlogfactor[dlog[b]] /. Tensor[] -> 1
+totalD[x_] /; Length[Variables[x]] === 0 := 0
+totalD[y_ dlog[x_List]] := 
+ Expand[dlog[x] totalD[y]] /. 
+  dlog[xx_] dlog[yy_List] :> dlog[Prepend[yy, xx]]
+totalD[dlog[x_List]] := dlog[x]
+
+ExpandTensor[exp_] := 
+ With[{hh = 
+    Expand[exp, _Tensor] //. 
+     Tensor[a___, 0, c___] :> Tensor[a, $zero$, c]}, 
+  NestWhile[
+     Expand[Expand[
+        If[Head[#] === Plus, totalD /@ #, 
+         totalD[#]], _dlog], _Tensor] &, 
+     Expand[Expand[
+        If[Head[hh] === Plus, totalD /@ (hh), 
+         totalD[hh]], _dlog], _Tensor] /. 
+      dlog[x_] :> dlog[List[x]], ! FreeQ[#, _Tensor] &] /. 
+    dlog[x_] :> Tensor @@ x /. $zero$ -> 0]
+
+SymbolMap[exp_] := 
+ With[{hh = Expand[exp, _G]}, 
+  NestWhile[
+    Expand[Expand[
+       If[Head[#] === Plus, totalD /@ #, totalD[#]], _dlog], _G] &, 
+    Expand[Expand[
+       If[Head[hh] === Plus, totalD /@ (hh), 
+        totalD[hh]], _dlog], _G] /. 
+     dlog[x_] :> dlog[List[x]], ! FreeQ[#, _G] &] /. 
+   dlog[x_] :> Tensor @@ x]
 
 (* to symbol *)
 preGtoSymbol[GT[{}, _, Tensor[b___]]] := Tensor[b]
@@ -443,7 +494,7 @@ revbranch[G[x_, var_], FitValue_ : {}] :=
 *)
 
 MoveVar[exp_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
- exp //. G[xx_, zz_] /; ! FreeQ[{xx, zz}, var] :> 
+ (Simplify /@exp) //. G[xx_, zz_] /; ! FreeQ[{xx, zz}, var] :> 
    preMoveVar[G[xx, zz], var, opts]
 
 combGvar[x_, var_] := 
