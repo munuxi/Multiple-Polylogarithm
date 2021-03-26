@@ -333,43 +333,44 @@ branchG[z_, y_, opts : OptionsPattern[{"FitValue"->{}}]] :=
 
 normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
  With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
+ With[{firstlimit=Simplify@Limit[First[z] /. nonvarFitValue, var -> 0],
+ lastlimit=Simplify@Limit[Last[z] /. nonvarFitValue, var -> 0]},
   Which[
    z === {}, 1,
    AnyTrue[DeleteCases[z /. nonvarFitValue, 0], Limit[1/#, var -> 0] === 0 &], 0,
    Last[z] === 0 || First[z] === 1,
     regword[myword @@ z, {1}, {0}] /. myword[xx__] :> normGvar0[{xx}, var, opts],
-   Limit[First[z] /. nonvarFitValue, var -> 0] =!= 1 && 
-    Limit[Last[z] /. nonvarFitValue, var -> 0] =!= 0, 
+   firstlimit =!= 1 && lastlimit =!= 0, 
    branchG[If[#[[1]] > 0, {0, 1}, 
        Rest[#]] & /@ (BranchLead[#, var, {0, 1}, opts] & /@ z), 
     1, opts], (* be careful *)
-   Limit[Last[z] /. nonvarFitValue, var -> 0] === 0, 
+   lastlimit === 0, 
    With[{hh = 
-      tailzero[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue]] /. var -> 0]]}, 
+      tailzero[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue] /. var -> 0]]]}, 
     With[{kk = 
        regGallnear0[
         Most[BranchLead[#, var, {0, 1}, opts]] & /@ 
          z[[-hh ;;]]]}, 
-     kk normGvar0[z[[;; -hh - 1]], var, opts] - 
+     kk If[kk === 0, 0, normGvar0[z[[;; -hh - 1]], var, opts]] - 
       Total[(normGvar0[#, var, opts] & /@ 
          Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]],
-   Limit[First[z] /. nonvarFitValue, var -> 0] === 1, 
+   firstlimit === 1, 
    With[{hh = 
-      headone[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue]] /. var -> 0]]}, 
+      headone[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue] /. var -> 0]]]}, 
     With[{kk = 
        regGallnear1[
         Most[BranchLead[#, var, {0, 1}, opts]] & /@ (1 - 
            z[[;; hh]])]}, 
-     kk normGvar0[z[[hh + 1 ;;]], var, opts] - 
+     kk If[kk === 0, 0, normGvar0[z[[hh + 1 ;;]], var, opts]] - 
       Total[(normGvar0[#, var, opts] & /@ 
-         Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]]]]]
+         Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]]]]]]
 
 NormGVar0[z_, y_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
 With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
  Which[
   z === {}, 1,
   y === 1, normGvar0[z, var, opts],
-  MatchQ[z, {0 ..}], (normGvar0[{1/(1 - y)}, var, opts]^Length[z])/Length[z]!,
+  MatchQ[z, {0 ..}], (normGvar0[Simplify@Together@{1/(1 - y)}, var, opts]^Length[z])/Length[z]!,
   Last[z] === 0, 
   Expand[With[{kk = tailzero[z], len = Length[z]}, 
     1/kk (NormGVar0[Most[z], y, var, opts] normGvar0[{1/(1 - y)}, var, opts] - 
