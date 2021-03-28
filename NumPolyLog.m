@@ -31,14 +31,12 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 (*some symbol calculation*)
 
 GetAlphabet[x_]:=Cases[x,Tensor[y__]:>y,Infinity]//Union
-(*
 tensor[___,1|-1,___]:=0
 tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
 tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
 expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
 ExpandTensor[exp_]:=expandTensor[exp/.Dispatch[#->Factor[#]&/@GetAlphabet[exp]]/.Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]
-*)
 
 dlogfactor[dlog[xx_]] := 
  dlogfactor[dlog[xx]] = 
@@ -63,6 +61,7 @@ totalD[y_ dlog[x_List]] :=
   dlog[xx_] dlog[yy_List] :> dlog[Prepend[yy, xx]]
 totalD[dlog[x_List]] := dlog[x]
 
+(*
 ExpandTensor[exp_] := 
  With[{hh = 
     Expand[exp, _Tensor] //. 
@@ -76,6 +75,7 @@ ExpandTensor[exp_] :=
          totalD[hh]], _dlog], _Tensor] /. 
       dlog[x_] :> dlog[List[x]], ! FreeQ[#, _Tensor] &] /. 
     dlog[x_] :> Tensor @@ x /. $zero$ -> 0]
+*)
 
 SymbolMap[exp_] := 
  With[{hh = Expand[exp, _G]}, 
