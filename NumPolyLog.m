@@ -1,7 +1,5 @@
 (* ::Package:: *)
 
-(* Get["MPLdata`"]; *)
-
 (* basic functions*)
 shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
@@ -30,7 +28,7 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 
 (*some symbol calculation*)
 
-GetAlphabet[x_]:=Cases[x,Tensor[y__]:>y,Infinity]//Union
+GetAlphabet[x_]:=Cases[1+x,Tensor[y__]:>y,Infinity]//Union
 tensor[___,1|-1,___]:=0
 tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
@@ -402,9 +400,10 @@ normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] :=
        regGallnear0[
         Most[BranchLead[#, var, {0, 1}, opts]] & /@ 
          z[[-hh ;;]]]}, 
+     If[Length[z] === hh, kk,
      kk If[kk === 0, 0, normGvar0[z[[;; -hh - 1]], var, opts]] - 
       Total[(normGvar0[#, var, opts] & /@ 
-         Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]],
+         Shufflep[z[[;; -hh - 1]], z[[-hh ;;]]])]]]],
    firstlimit === 1, 
    With[{hh = 
       headone[Rationalize@Chop[Simplify[Together[z /. nonvarFitValue] /. var -> 0]]]}, 
@@ -412,9 +411,10 @@ normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] :=
        regGallnear1[
         Most[BranchLead[#, var, {0, 1}, opts]] & /@ (1 - 
            z[[;; hh]])]}, 
+     If[Length[z] === hh, kk,
      kk If[kk === 0, 0, normGvar0[z[[hh + 1 ;;]], var, opts]] - 
       Total[(normGvar0[#, var, opts] & /@ 
-         Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]]]]]]
+         Shufflep[z[[;; hh]], z[[hh + 1 ;;]]])]]]]]]]
 
 NormGVar0[z_, y_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
 With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
@@ -518,7 +518,7 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
          dlog[xx_ /; PolynomialQ[xx, var]] :> 
           dlog[xx/Coefficient[xx, var^Exponent[xx, var]]])]}, 
    With[{jj = 
-      Select[(Union@Cases[hh, _dlog, Infinity] /. 
+      Select[(Union@Cases[1 + hh, _dlog, Infinity] /. 
          dlog -> Identity), ! (PolynomialQ[#, var] && 
            Exponent[#, var] === 1) &]}, 
     If[Length[jj] > 0, Message[GIntegrate::notlinearred, First[jj]];
