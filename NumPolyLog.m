@@ -3,7 +3,7 @@
 (* basic functions*)
 shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
-robustMemberQ[list_,mem_]:=AnyTrue[list-mem,PossibleZeroQ]
+robustMemberQ[list_,mem_]:=If[Head[mem]===List,MemberQ[list,mem],AnyTrue[list-mem,PossibleZeroQ]]
 readfirstnotinpos[list_,sublist_,direction_]:=Which[direction===1,If[Length[list]>0&&robustMemberQ[sublist,First[list]],readfirstnotinpos[Rest[list],sublist,direction]+1,0],direction===-1,If[Length[list]>0&&robustMemberQ[sublist,Last[list]],readfirstnotinpos[Most[list],sublist,direction]+1,0],True,0]
 tailzero[list_]:=readfirstnotinpos[list,{0},-1]
 headone[list_]:=readfirstnotinpos[list,{1},1]
