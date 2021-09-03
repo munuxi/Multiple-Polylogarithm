@@ -494,7 +494,7 @@ revbranch[G[x_, var_], FitValue_ : {}] :=
 *)
 
 MoveVar[exp_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
- (Simplify /@exp) //. G[xx_, zz_] /; ! FreeQ[{xx, zz}, var] :> 
+ (Simplify /@exp) //. G[xx_, zz_] /; ((! FreeQ[{xx, zz}, var]) && zz =!= var) :> 
    preMoveVar[G[xx, zz], var, opts]
 
 combGvar[x_, var_] := 
