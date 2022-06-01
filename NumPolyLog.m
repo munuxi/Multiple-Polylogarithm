@@ -356,7 +356,7 @@ BranchLead[func_, var_, range_, OptionsPattern[{"FitValue"->{}}]] :=
      SeriesCoefficient[func /. nonvarFitValue, {var, 0, md}]},
    Which[
     FreeQ[func, var], {0, func, 1},
-    ! NumberQ[numlead], {0, lead, 1},
+    ! NumberQ[numlead], {md, lead, 1},
     md == 0 && ! Element[numlead, Reals], {0, lead, 1},
     md == 0 && ! (First[range] < numlead < Last[range]), {0, lead, 1},
     md == 0 && First[range] < numlead < Last[range],
@@ -541,3 +541,26 @@ GIntegrate[x_, {var_, a_, b_}, opts : OptionsPattern[{"FitValue" -> {}}]] :=
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 
    G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
+   
+UpliftSymbol[exp_, vars_] := 
+ With[{hh = Select[vars, MemberQ[Variables[GetAlphabet[exp]], #] &], 
+   weights = 
+    Union@Cases[1 + exp, Tensor[x___] :> Length[{x}], Infinity]},
+  Which[
+    hh === {}, exp,
+    Length[weights] =!= 1, Print["not unit weight"]; Abort[],
+    First[weights] == 1 , exp /. Tensor[x_] :> G[{0}, x],
+    True, 
+    With[{jj = 
+       GIntegrate[
+        If[Head[#] === Plus, 
+           First[Union[
+                Cases[#, _dlog, Infinity]]] UpliftSymbol[# /. _dlog :>
+                  1, vars] & /@ #, 
+           First[Union[
+              Cases[#, _dlog, Infinity]]] UpliftSymbol[# /. _dlog :> 
+               1, vars]] &@
+         Collect[exp /. Tensor[x___, y_] :> Tensor[x] dlog[y] /. 
+           dlog[x_] :> 0 /; FreeQ[x, First[hh]], _dlog], First[hh]]},
+     jj + UpliftSymbol[Expand[ExpandTensor[exp - SymbolMap[jj]]], vars]]] /. 
+   Pi -> 0]
