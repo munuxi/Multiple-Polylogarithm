@@ -146,6 +146,26 @@ ToSymbol[exp_] :=
          Tensor[a]^(b - 2) Total[Tensor @@@ Shuffle[{a}, {a}]]} /. 
       Tensor[___, 1 | -1, ___] :> 0] &, hh /. Log[x_] :> Tensor[x]]]
 
+(* graded structure *)
+
+GetWeight[a_ b_] := GetWeight[a] + GetWeight[b]
+GetWeight[Power[a_, b_Integer]] := b GetWeight[a]
+GetWeight[Pi] := 1
+GetWeight[Zeta[a_]] := a
+GetWeight[Log[a_]] := 1
+GetWeight[PolyLog[a_, b_]] := a
+GetWeight[Tensor[a__]] := Length[{a}]
+GetWeight[G[x_, y_]] := Length[x]
+GetWeight[MPLG[x_, y_]] := Length[x]
+GetWeight[a_Plus] := 
+ If[SameQ @@ (GetWeight /@ (List @@ a)), GetWeight[First[a]], -1]
+GetWeight[a_List] := GetWeight /@ a
+GetWeight[
+   a_] /; (Head[a] =!= G && Head[a] =!= MPLG && Head[a] =!= Tensor && 
+    Head[a] =!= Log && Head[a] =!= PolyLog && Head[a] =!= Zeta && 
+    a =!= Power && a =!= Plus && a =!= List && a =!= Pi) := 0
+TakeWeight[k_][exp_] := Select[Expand[exp], GetWeight[#] === k &]
+
 (* 
 extendedG is the extended G function introduced in the section 5.3 of 0410259 :
     extendedG[y1,{b1,...,br},{z1,...,zn},y2,k] = int_0^y1 ds1/(s1-b1) ... int_0^s(r-1) dsr/(sr-br) G(z1,...,z(k-1),sr,z(k+1),...,zn;y2),
