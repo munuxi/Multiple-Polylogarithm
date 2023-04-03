@@ -37,6 +37,7 @@ tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
 expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
 ExpandTensor[exp_]:=expandTensor[exp/.Dispatch[#->Factor[#]&/@GetAlphabet[exp]]/.Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]
 
+Options[dlogfactor] = {"FactorRoot" -> False, "Roots" -> {}};
 dlogfactor[dlog[xx_]] := 
  dlogfactor[dlog[xx]] = 
   With[{hh = FactorList[xx]}, Total[dlog[#[[1]]] #[[2]] & /@ hh] /. 
@@ -136,6 +137,11 @@ GtoSymbol[exp_] :=
 PolyLogToG[exp_] := 
  exp /. {Log[x_] :> G[{0}, x], 
    PolyLog[k_, x_] :> -G[Append[ConstantArray[0, k - 1], 1], x]}
+
+HPLToG[exp_] := 
+ exp /. HPL[x_, 
+    y_] :> (-1)^Length[x] G[longhand[x, ConstantArray[1, Length@x]], 
+     y]
 
 ToSymbol[exp_] := 
  With[{hh = GtoSymbol@PolyLogToG@exp}, 
@@ -471,18 +477,46 @@ ddG[y_, z_, var_] := ddG[y, z, var] =
    dlog[xx/Coefficient[xx, var^Exponent[xx, var]]]
 *)
 
-dlogfactor[exp_, var_] := dlogfactor[exp, var] = 
- With[{hh = exp /. dlog[xx_] :> 
-        Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
-      dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+dlogfactor[x_dlog + y_dlog, var_, opts : OptionsPattern[]] := 
+  dlogfactor[x, var, opts] + dlogfactor[y, var, opts];
+dlogfactor[x_dlog - y_dlog, var_, opts : OptionsPattern[]] := 
+  dlogfactor[x, var, opts] - dlogfactor[y, var, opts];
+dlogfactor[a_ x_dlog, var_, opts : OptionsPattern[]] := 
+  a dlogfactor[x, var, opts];
+
+(* 
+TODO: it could be wrong when recursively using it, since it will find the roots 
+of polynomials like x^2-root$12123, but root$12123 can also depend on x.
+*)
+dlogfactor[exp_, var_, opts : OptionsPattern[]] := 
+ dlogfactor[exp, var, opts] = 
+   With[{hh = exp /. dlog[xx_] :> 
+                 Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
+             dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+           dlog[xx_ /; PolynomialQ[xx, var]] :> 
+             
+       dlog[Collect[xx/Coefficient[xx, var^Exponent[xx, var]], var]]}, 
+     If[! OptionValue["FactorRoot"], With[{jj = 
+            Select[(Union@Cases[1 + hh, _dlog, Infinity] /. 
+                  dlog -> Identity), ! (PolynomialQ[#, var] && 
+                      Exponent[#, var] === 1) &]}, 
+        If[Length[jj] > 0, 
+      Message[MoveVar::notlinearred, First[jj]]; 
+          Abort[]; hh, hh]],
+    hh /. 
      dlog[xx_ /; PolynomialQ[xx, var]] :> 
-      dlog[xx/Coefficient[xx, var^Exponent[xx, var]]]}, 
-  With[{jj = 
-     Select[(Union@Cases[1 + hh, _dlog, Infinity] /. 
-        dlog -> Identity), ! (PolynomialQ[#, var] && 
-          Exponent[#, var] === 1) &]}, 
-   If[Length[jj] > 0, Message[MoveVar::notlinearred, First[jj]]; 
-    Abort[];, hh]]]
+      With[{deg = Exponent[xx, var]},
+       If[deg === 1, dlog[xx],
+        If[! MemberQ[First /@ OptionValue["Roots"], {xx, var}],
+         With[{jj = Table[Unique[root], {i, deg}]},
+          
+          SetOptions[dlogfactor, 
+           "Roots" -> Append[OptionValue["Roots"], {xx, var} -> jj]];
+          Sum[dlog[var - jj[[i]]], {i, deg}]],
+         With[{jj = {xx, var} /. OptionValue["Roots"]},
+          Sum[dlog[var - jj[[i]]], {i, deg}]]
+         ]]
+       ]]]
 
 preMoveVar[G[y_, z_], var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
  preMoveVar[G[y, z], var, opts] = NormGVar0[y, z, var, opts] +
