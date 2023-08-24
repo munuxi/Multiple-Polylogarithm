@@ -15,6 +15,8 @@ Shufflep[s1_,s2_]:=With[{p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]]
 (*minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,If[Limit[f,var->0]===0,minideg[f/var,var]+1,0]];*)
 minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]===0,-minideg[1/f,var],Chop@Limit[f,var->0]===0,minideg[f/var,var]+1,True,0]]
 deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
+CoeffsList[exp_,vars_]:=Normal[Prepend[Transpose@{vars,#[[2]]},{1,#[[1]]}]]&@CoefficientArrays[exp,vars]
+FastCollect[exp_,head_]:=DeleteCases[With[{tensors=Cases[1+exp,head,Infinity]//Union},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
 poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
@@ -38,6 +40,11 @@ expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
 ExpandTensor[exp_]:=expandTensor[exp/.Dispatch[#->Factor[#]&/@GetAlphabet[exp]]/.Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]
 
 Options[dlogfactor] = {"FactorRoot" -> False, "Roots" -> {}};
+GetRoots[] := With[{hh = Options[dlogfactor, "Roots"][[1, 2]]},
+  If[hh === {}, {}, 
+   Flatten[Table[#[[2, i]] -> root[#[[1, 1]], #[[1, 2]], i], {i, 
+        Length[#[[2]]]}] & /@ hh]]]
+
 dlogfactor[dlog[xx_]] := 
  dlogfactor[dlog[xx]] = 
   With[{hh = FactorList[xx]}, Total[dlog[#[[1]]] #[[2]] & /@ hh] /. 
@@ -59,7 +66,9 @@ totalD[x_] /; Length[Variables[x]] === 0 := 0
 totalD[y_ dlog[x_List]] := 
  Expand[dlog[x] totalD[y]] /. 
   dlog[xx_] dlog[yy_List] :> dlog[Prepend[yy, xx]]
-totalD[dlog[x_List]] := dlog[x]
+totalD[x_, n_Integer /; n > 0] := 
+ If[n === 1, totalD[x] /. dlog[u_] :> dlog[{u}], 
+  totalD[Expand@totalD[x, n - 1]]]
 
 (*
 ExpandTensor[exp_] := 
@@ -154,6 +163,8 @@ ToSymbol[exp_] :=
 
 (* graded structure *)
 
+GetWeight[a_Rationals]:=0
+GetWeight[a_Integers]:=0
 GetWeight[a_ b_] := GetWeight[a] + GetWeight[b]
 GetWeight[Power[a_, b_Integer]] := b GetWeight[a]
 GetWeight[Pi] := 1
@@ -302,8 +313,8 @@ regwordabove[word_myword, removelist_] :=
           ConstantArray[-1, 
            k - 1], (List @@ word)[[k + 1 ;;]]])}, (jj /. 
         myword[x___] :> myword[word[[k]], x]) - (jj /. 
-        myword[x___] :> myword[-1, x])], {k, 1, Length@word}]
-  , With[{hh = readfirstnotinpos[List @@ word, removelist, 1]},
+        myword[x___] :> myword[-1, x])], {k, 1, Length@word}],
+  With[{hh = readfirstnotinpos[List @@ word, removelist, 1]},
    Which[hh === 0, word,
     Length[word] === hh, 0,
     True, (-1)^hh Total[
@@ -462,21 +473,6 @@ With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
 
 MoveVar::notlinearred = "`1` is not linear reducible!";
 
-(* it's useful for debug 
-ddG[y_, z_, var_] := ddG[y, z, var] = 
- If[Length[y] === 1, 
-     dlog[First[y] - z] - 
-      dlog[First[y]], -dlog[Last[y]] G[Most[y], z] + 
-      dlog[z - First[y]] G[Rest[y], z] + 
-      Sum[dlog[
-         y[[i]] - y[[i + 1]]] (G[Delete[y, i + 1], z] - 
-          G[Delete[y, i], z]), {i, 1, Length[y] - 1}]] /. 
-    dlog[xx_] :> Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
-   dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
-  dlog[xx_ /; PolynomialQ[xx, var]] :> 
-   dlog[xx/Coefficient[xx, var^Exponent[xx, var]]]
-*)
-
 dlogfactor[x_dlog + y_dlog, var_, opts : OptionsPattern[]] := 
   dlogfactor[x, var, opts] + dlogfactor[y, var, opts];
 dlogfactor[x_dlog - y_dlog, var_, opts : OptionsPattern[]] := 
@@ -494,7 +490,6 @@ dlogfactor[exp_, var_, opts : OptionsPattern[]] :=
                  Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
              dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
            dlog[xx_ /; PolynomialQ[xx, var]] :> 
-             
        dlog[Collect[xx/Coefficient[xx, var^Exponent[xx, var]], var]]}, 
      If[! OptionValue["FactorRoot"], With[{jj = 
             Select[(Union@Cases[1 + hh, _dlog, Infinity] /. 
@@ -509,7 +504,6 @@ dlogfactor[exp_, var_, opts : OptionsPattern[]] :=
        If[deg === 1, dlog[xx],
         If[! MemberQ[First /@ OptionValue["Roots"], {xx, var}],
          With[{jj = Table[Unique[root], {i, deg}]},
-          
           SetOptions[dlogfactor, 
            "Roots" -> Append[OptionValue["Roots"], {xx, var} -> jj]];
           Sum[dlog[var - jj[[i]]], {i, deg}]],
@@ -517,6 +511,14 @@ dlogfactor[exp_, var_, opts : OptionsPattern[]] :=
           Sum[dlog[var - jj[[i]]], {i, deg}]]
          ]]
        ]]]
+
+dlogfactor2[exp_, var_, opts : OptionsPattern[]] := 
+   With[{hh = exp /. dlog[xx_] :> 
+                 Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
+             dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+           dlog[xx_ /; PolynomialQ[xx, var]] :> 
+       dlog[Collect[xx/Coefficient[xx, var^Exponent[xx, var]], var]]}, 
+     hh]
 
 preMoveVar[G[y_, z_], var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
  preMoveVar[G[y, z], var, opts] = NormGVar0[y, z, var, opts] +
@@ -547,17 +549,45 @@ revbranch[G[x_, var_], FitValue_ : {}] :=
       D[qq, var] === 1] :> (preMoveVar[G[pp, qq], var, FitValue])
 *)
 
-MoveVar[exp_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
+(* only for debug now *)
+oldMoveVar[exp_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
  (Simplify /@exp) //. G[xx_, zz_] /; ((! FreeQ[{xx, zz}, var]) && zz =!= var) :> 
    preMoveVar[G[xx, zz], var, opts]
 
-combGvar[x_, var_] := 
- FixedPoint[
-  Expand[# //. {G[xx_, var] G[yy_, var] :> 
-       Total[G[#, var] & /@ Shuffle[xx, yy]], 
-      G[xx_, var]^k_Integer /; k > 1 :> 
-       G[xx, var]^(k - 2) Total[G[#, var] & /@ Shuffle[xx, xx]]}] &, 
-  x]
+(* only for UT pure function *)
+MoveVar[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
+ If[GetWeight[x] > 
+   0, (x /. {G[y_, z_] :> NormGVar0[y, z, var, opts]}) + 
+   With[{hh = totalD[x] /. dlog[y_] :> dlogfactor[dlog[y], var] /. _totalD :> 0}, 
+    If[hh === 0, 0, 
+     With[{dlogs = Union[Cases[1 + hh, _dlog, Infinity]]}, 
+       Expand[(MoveVar[#, var, opts] & /@ 
+             Normal@Last@CoefficientArrays[hh, dlogs]) . dlogs] /. 
+         dlog[xx_] G[s1_, var] :> 
+          G[Prepend[s1, -xx /. var -> 0], var] /. 
+        dlog[xx_] :> G[{-xx /. var -> 0}, var]] /. {G[_, 0] :> 0, 
+       G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}]], x]
+
+
+(* allow chern iterated rep *)
+preChernMoveVar[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
+  If[GetWeight[x] > 
+   0, (x /. {G[y_, z_] :> NormGVar0[y, z, var, opts]}) + 
+   With[{hh = 
+      FastCollect[
+       totalD[x] /. dlog[y_] :> dlogfactor2[dlog[y], var] /. _totalD :>
+          0, _dlog]}, 
+    If[hh === 0, 
+     0, (Expand[
+          Total[#[[1]] preChernMoveVar[#[[2]], var, opts] & /@ hh]] /. 
+         dlog[xx_] ChernG[s1_, var] :> ChernG[Prepend[s1, xx], var] /. 
+        dlog[xx_] :> ChernG[{xx}, var]) /. {G[_, 0] :> 0, 
+       G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}]], x]
+ChernMoveVar[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
+ preChernMoveVar[x, var, opts] /. 
+  ChernG[a_, var] :> 
+   If[AllTrue[a, Exponent[#, var] === 1 &], G[-a /. var -> 0, var], 
+    ChernG[a, var]]
 
 GIntegrate::notlinearred = "`1` is not linear reducible!";
 preGIntegrate[x_, var_] /; FreeQ[x, var] := x var
@@ -580,9 +610,19 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
   dlog[xx_] G[yy_, var] :> G[Prepend[yy, -xx /. var -> 0], var]
 preGIntegrate[dlog[x_],var_] := preGIntegrate[dlog[x]G[{},var],var]
 
+combGvar[x_, var_] := 
+ FixedPoint[
+  Expand[# //. {G[xx_, var] G[yy_, var] :> 
+       Total[G[#, var] & /@ Shuffle[xx, yy]], 
+      G[xx_, var]^k_Integer /; k > 1 :> 
+       G[xx, var]^(k - 2) Total[G[#, var] & /@ Shuffle[xx, xx]]}] &, 
+  x]
 
-GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue"->{}}]] := 
- With[{hh = Expand[combGvar[MoveVar[x, var, opts], var]]}, 
+GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
+ With[{hh = 
+    Expand[combGvar[
+      Total[#[[1]] MoveVar[#[[2]], var, opts] & /@ 
+        FastCollect[x, _dlog]], var]]}, 
   If[Head[hh] === Plus, preGIntegrate[#, var] & /@ hh, 
    preGIntegrate[hh, var]]]
 
@@ -595,7 +635,28 @@ GIntegrate[x_, {var_, a_, b_}, opts : OptionsPattern[{"FitValue" -> {}}]] :=
      xx_] :> (regwordabove[myword @@ {xx, xxx}, {xx}] /. 
       myword[zz__] :> G[{zz}, xx]) /. {G[_, 0] :> 0, 
    G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
-   
+
+newgint[poly_, G[y_, var_], var_] := 
+ If[y === {}, Integrate[poly, var], 
+  With[{hh = Integrate[(poly /. var -> var + First[y]), var]}, 
+   Expand[hh /. var -> var - First[y], var] G[y, 
+      var] - (hh /. var -> 0) G[y, var] - 
+    ngint[Expand[(hh - (hh /. var -> 0))/var, var] /. 
+      var -> var - First[y], G[Rest[y], var], var]]]
+
+newgint[inv[var_, x_, deg_], G[y_, var_], var_] :=
+ If[deg === 1, G[Prepend[y, x], var],
+  1/(1 - deg) If[y === {}, 1/(var - x)^(deg - 1), If[First[y] === x,
+     1/(var - x)^(deg - 1) G[y, var] - 
+      ngint[inv[var, x, deg], G[Rest[y], var], var],
+     1/(var - x)^(deg - 1) G[y, var] - 
+      1/(First[y] - x)^(deg - 1) G[y, var] + 
+      Sum[1/(First[y] - x)^(k) ngint[inv[var, x, deg - k], 
+         G[Rest[y], var], var], {k, deg - 1}]]]]
+
+(* TODO: need a function to apart rational functions *)
+
+(* uplift symbol *)
 UpliftSymbol[exp_, vars_] := 
  With[{hh = Select[vars, MemberQ[Variables[GetAlphabet[exp]], #] &], 
    weights = 

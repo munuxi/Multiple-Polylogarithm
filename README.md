@@ -61,7 +61,7 @@ Out[7]= - 2.9589260121255572590640327182307418000466293019986
 Suppose we have a function G({a1(t),...,an(t)},z), we want to rewrite it into a sum of 
 constants and G functions with the from
     G({b1,...,bn},t),
-where bi is free of t. Then we can calcluate the 1d integral 
+where bi is free of t. Then we can calculate the 1d integral 
 ```
   int dt/(t-b0) G({a1(t),...,an(t)},z)
 ```
@@ -180,7 +180,7 @@ It's also possible to speed up recursions. For example, `MPLG[{1, 2, 3, 4, 5}, 6
 
 ### Cross the Branch Cut
 
-In our realization of `MoveVar`, we consider the choice of branch by assuming the variable t to be a positive number with a infinitesimal negative imaginary part. If `t-i0 -> t+i0` doesn't cross the branch cut of the function, the result of `MoveVar` doesn't care about the infinitesimal imaginary part. Otherwise, the result of `MoveVar` is on the `t-i0` side. For example, 
+In our realization of `MoveVar`, we consider the choice of the branch by assuming the variable t to be a positive number with an infinitesimal negative imaginary part. If `t-i0 -> t+i0` doesn't cross the branch cut of the function, the result of `MoveVar` doesn't care about the infinitesimal imaginary part. Otherwise, the result of `MoveVar` is on the `t-i0` side. For example, 
 ```Mathematica
 In[16]:= MoveVar[G[{t}, 2], t]
 
@@ -202,7 +202,7 @@ It's not wrong and rare in practice, but also annoying if someone doesn't notice
 
 ## Related Packages
 
-It seems that [Ginac](https://ginac.de/) (in C++) is the only software provides numerical evaluations of all known polylogarithms.
+It seems that [Ginac](https://ginac.de/) (in C++) is the only software providing numerical evaluations of all known polylogarithms.
 
 [PolyLogTools](https://arxiv.org/abs/1904.07279) use Ginac as its backend to support numerical evaluations.
 
