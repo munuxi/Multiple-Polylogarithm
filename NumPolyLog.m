@@ -308,12 +308,12 @@ regwordbelow[word_myword, removelist_] :=
 
 regwordabove[word_myword, removelist_] :=
  If[removelist === Infinity,
-  Sum[(-1)^(k - 1) With[{jj = 
+  Sum[(-1)^($k$ - 1) With[{jj = 
        If[# === {}, myword[], Total[myword @@@ #]] &@(Shuffle[
           ConstantArray[-1, 
-           k - 1], (List @@ word)[[k + 1 ;;]]])}, (jj /. 
-        myword[x___] :> myword[word[[k]], x]) - (jj /. 
-        myword[x___] :> myword[-1, x])], {k, 1, Length@word}],
+           $k$ - 1], (List @@ word)[[$k$ + 1 ;;]]])}, (jj /. 
+        myword[x___] :> myword[word[[$k$]], x]) - (jj /. 
+        myword[x___] :> myword[-1, x])], {$k$, 1, Length@word}],
   With[{hh = readfirstnotinpos[List @@ word, removelist, 1]},
    Which[hh === 0, word,
     Length[word] === hh, 0,
