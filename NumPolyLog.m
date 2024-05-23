@@ -4,8 +4,8 @@
 AllCases[exp_,head_]:=Union[Cases[exp,head,All]]
 shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
-robustMemberQ[list_,mem_]:=If[Head[mem]===List,MemberQ[list,mem],AnyTrue[list-mem,PossibleZeroQ]]
-readfirstnotinpos[list_,sublist_,direction_]:=Which[direction===1,If[Length[list]>0&&robustMemberQ[sublist,First[list]],readfirstnotinpos[Rest[list],sublist,direction]+1,0],direction===-1,If[Length[list]>0&&robustMemberQ[sublist,Last[list]],readfirstnotinpos[Most[list],sublist,direction]+1,0],True,0]
+RobustMemberQ[list_,mem_]:=If[Head[mem]===List,MemberQ[list,mem],AnyTrue[list-mem,PossibleZeroQ]]
+readfirstnotinpos[list_,sublist_,direction_]:=Which[direction===1,If[Length[list]>0&&RobustMemberQ[sublist,First[list]],readfirstnotinpos[Rest[list],sublist,direction]+1,0],direction===-1,If[Length[list]>0&&RobustMemberQ[sublist,Last[list]],readfirstnotinpos[Most[list],sublist,direction]+1,0],True,0]
 tailzero[list_]:=readfirstnotinpos[list,{0},-1]
 headone[list_]:=readfirstnotinpos[list,{1},1]
 Shuffle[{},{}]:={}
@@ -66,12 +66,12 @@ totalD[x_ y_] := totalD[x] y + totalD[y] x
 totalD[x_^n_Integer] := n x^(n - 1) totalD[x]
 totalD[G[a_, z_]] := 
  totalD[G[a, z]] = 
-  Sum[G[Delete[a, i], z] Which[Length[a] == 1, 
-       dlog[a[[i]] - z] - dlog[a[[i]] - 0], i == 1, 
-       dlog[a[[i]] - z] - dlog[a[[i]] - a[[i + 1]]], i == Length[a], 
-       dlog[a[[i]] - a[[i - 1]]] - dlog[a[[i]] - 0], True, 
-       dlog[a[[i]] - a[[i - 1]]] - dlog[a[[i]] - a[[i + 1]]]], {i, 
-      Length[a]}] /. dlog[xx_] :> dlogfactor[dlog[xx]] /. G[{}, _] :> 1
+  Total@Array[G[Delete[a, #], z] Which[Length[a] == 1, 
+       dlog[a[[#]] - z] - dlog[a[[#]] - 0], # == 1, 
+       dlog[a[[#]] - z] - dlog[a[[#]] - a[[# + 1]]], # == Length[a], 
+       dlog[a[[#]] - a[[# - 1]]] - dlog[a[[#]] - 0], True, 
+       dlog[a[[#]] - a[[# - 1]]] - dlog[a[[#]] - a[[# + 1]]]]&, 
+      Length[a]] /. dlog[xx_] :> dlogfactor[dlog[xx]] /. G[{}, _] :> 1
 totalD[Tensor[a___, b_]] := 
  Tensor[a] dlogfactor[dlog[b]] /. Tensor[] -> 1
 totalD[x_] /; Length[Variables[x]] === 0 := 0
@@ -112,12 +112,12 @@ SymbolMap[exp_] :=
 (* to symbol *)
 preGtoSymbol[GT[{}, _, Tensor[b___]]] := Tensor[b]
 preGtoSymbol[GT[a_, z_, Tensor[b___]]] := 
- Sum[preGtoSymbol[
-   GT[Delete[a, i], z, 
-    Tensor[Which[Length[a] == 1, (a[[i]] - z)/(a[[i]] - 0), i == 1, (
-      a[[i]] - z)/(a[[i]] - a[[i + 1]]), i == Length[a], (
-      a[[i]] - a[[i - 1]])/(a[[i]] - 0), True, (a[[i]] - a[[i - 1]])/(
-      a[[i]] - a[[i + 1]])], b]]], {i, Length[a]}]
+ Total@Array[preGtoSymbol[
+   GT[Delete[a, #], z, 
+    Tensor[Which[Length[a] == 1, (a[[#]] - z)/(a[[#]] - 0), # == 1, (
+      a[[#]] - z)/(a[[#]] - a[[# + 1]]), # == Length[a], (
+      a[[#]] - a[[# - 1]])/(a[[#]] - 0), True, (a[[#]] - a[[# - 1]])/(
+      a[[#]] - a[[# + 1]])], b]]]&, Length[a]]
 slowGtoSymbol[G[a_, z_]] := preGtoSymbol[GT[a, z, Tensor[]]]
 
 generateGtosymbol[
@@ -136,10 +136,10 @@ removetailzero[anyG[z_, y_]] :=
   Expand[With[{zz = Most[z]}, 
     With[{kk = tailzero[z], len = Length[z]}, 
      1/kk (If[y === 1, 0, Log[y] removetailzero@anyG[zz, y]] - 
-        Sum[removetailzero@
-          anyG[Join[z[[1 ;; m]], {0}, 
-            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
-            ConstantArray[0, kk - 1]], y], {m, 0, len - kk - 1}])]]], 
+        Total@Array[removetailzero@
+          anyG[Join[z[[1 ;; # - 1]], {0}, 
+            z[[# ;; len - kk - 1]], {z[[len - kk]]}, 
+            ConstantArray[0, kk - 1]], y]&, len - kk])]]], 
   True, anyG[z, y]]
 
 GtoSymbol[exp_] := 
@@ -212,7 +212,7 @@ extendedG[y1_,b_,z_,0,0]/;!MatchQ[z,{0..}]:=0
 (* ini : be careful FirstPosition*)
 extendedG[y1_,b_,z_,y_,0]/;(Last[z]=!=0):=(If[b==={},1,extendedG[0,{},b,y1,0]]*If[!AnyTrue[DeleteCases[z,0],Abs[#]<Abs[y]&],goodG[z/y,1],With[{pos=First@First@Position[Abs[Chop[z]],Min[Abs@DeleteCases[Chop[z],0]],1]},extendedG[z[[pos]],{},ReplacePart[z,pos->0],y,pos]]])
 (* remove tail zero *)
-extendedG[y1_,b_,{zz___,0},y2_,w_]/;(w=!=Length[{zz,0}]):=(extendedG[y1,b,{zz,0},y2,w]=Expand[With[{z={zz,0}},With[{kk=If[Length[z]-#<w,Length[z]-w,#]&@tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]extendedG[y1,b,{zz},y2,w]]-Sum[extendedG[y1,b,Join[z[[1;;m]],{0},z[[m+1;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,If[w!=0&&m<w,w+1,w]],{m,0,len-kk-1}])]]])
+extendedG[y1_,b_,{zz___,0},y2_,w_]/;(w=!=Length[{zz,0}]):=(extendedG[y1,b,{zz,0},y2,w]=Expand[With[{z={zz,0}},With[{kk=If[Length[z]-#<w,Length[z]-w,#]&@tailzero[z],len=Length[z]},1/kk (If[y2===1,0,Log[y2]extendedG[y1,b,{zz},y2,w]]-Total@Array[extendedG[y1,b,Join[z[[1;;#-1]],{0},z[[#;;len-kk-1]],{z[[len-kk]]},ConstantArray[0,kk-1]],y2,If[w!=0&&#-1<w,w+1,w]]&,len-kk])]]])
 (* special values, assuming dG[1]=log[0]->0*)
 (* almost all zero, Li *)
 extendedG[y1_,b_,z_,y_,0]/;MatchQ[Most[z],{0..}]:=-If[b==={},1,extendedG[0,{},b,y1,0]]*PolyLog[Length[z],y/Last[z]];
@@ -234,7 +234,7 @@ goodG[z_List]/;Length[z]===2:=-PolyLog[2,1/(1-z[[1]])]-PolyLog[2,1/z[[2]]]+PolyL
 (* acc G, use Hölder convolution to accelerate convergence *)
 accG[{z_},prec_:50]:=Log[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
-accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Sum[(-1)^j accG[2(1-Reverse[z[[1;;j]]]),prec]accG[2z[[j+1;;]],prec],{j,1,Length[z]-1}],poorNG[z,1,prec]]];
+accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Total@Array[(-1)^# accG[2(1-Reverse[z[[1;;#]]]),prec]accG[2z[[#+1;;]],prec] &,Length[z]-1],poorNG[z,1,prec]]];
 (* define MPLG *)
 SetAttributes[MPLG, NumericFunction]
 MPLG[{}, _]  := 1
@@ -249,10 +249,10 @@ MPLG[zzz_, y_ /; y =!= 0] /; AllTrue[Append[zzz, y], NumberQ] && AnyTrue[Append[
    Expand[With[{zz = Most[z]}, 
      With[{kk = tailzero[z], len = Length[z]}, 
       1/kk (If[y === 1, 0, Log[y] MPLG[zz, y]] - 
-         Sum[MPLG[
-           Join[z[[1 ;; m]], {0}, 
-            z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
-            ConstantArray[0, kk - 1]], y], {m, 0, len - kk - 1}])]]], 
+         Total@Array[MPLG[
+           Join[z[[1 ;; # - 1]], {0}, 
+            z[[# ;; len - kk - 1]], {z[[len - kk]]}, 
+            ConstantArray[0, kk - 1]], y]&, len - kk])]]], 
    N[If[Rationalize[First[z]/y, 0] === 1, ComplexInfinity, 
      extendedG[0, {}, Rationalize[z/y, 0], 1, 0] /. 
        goodG[x_] :> goodG[Rationalize[x, 0]] //. {goodG[x_] :> 
@@ -323,12 +323,12 @@ regwordbelow[word_myword, removelist_] :=
 
 regwordabove[word_myword, removelist_] :=
  If[removelist === Infinity,
-  Sum[(-1)^($k$ - 1) With[{jj = 
+  Total@Array[((-1)^(# - 1) With[{jj = 
        If[# === {}, myword[], Total[myword @@@ #]] &@(Shuffle[
           ConstantArray[-1, 
-           $k$ - 1], (List @@ word)[[$k$ + 1 ;;]]])}, (jj /. 
-        myword[x___] :> myword[word[[$k$]], x]) - (jj /. 
-        myword[x___] :> myword[-1, x])], {$k$, 1, Length@word}],
+           # - 1], (List @@ word)[[# + 1 ;;]]])}, (jj /. 
+        myword[x___] :> myword[word[[#]], x]) - (jj /. 
+        myword[x___] :> myword[-1, x])])&, Length@word],
   With[{hh = readfirstnotinpos[List @@ word, removelist, 1]},
    Which[hh === 0, word,
     Length[word] === hh, 0,
@@ -478,11 +478,11 @@ With[{nonvarFitValue = DeleteCases[OptionValue["FitValue"], var -> _]},
   PossibleZeroQ@Last[z], 
   Expand[With[{kk = tailzero[z], len = Length[z]}, 
     1/kk (NormGVar0[Most[z], y, var, opts] normGvar0[{1/(1 - y)}, var, opts] - 
-       Sum[NormGVar0[
-         Join[z[[1 ;; m]], {0}, 
-          z[[m + 1 ;; len - kk - 1]], {z[[len - kk]]}, 
-          ConstantArray[0, kk - 1]], y, var, opts], {m, 0, 
-         len - kk - 1}])]],
+       Total@Array[NormGVar0[
+         Join[z[[1 ;; # - 1]], {0}, 
+          z[[# ;; len - kk - 1]], {z[[len - kk]]}, 
+          ConstantArray[0, kk - 1]], y, var, opts]&, 
+         len - kk])]],
   True, normGvar0[z/y, var, opts]]]
 
 (* Newton-Leibniz reduction *)
@@ -525,17 +525,17 @@ dlogfactor[exp_, var_, opts : OptionsPattern[]] :=
              1 + Max@Union@
                 Cases[OptionValue["Roots"], root[a_, _] :> a, 
                  All]]},
-          With[{jj = Table[root[kk, i], {i, deg}]}, 
+          With[{jj = Array[root[kk, #]&, deg]}, 
            SetOptions[dlogfactor, 
             "Roots" -> 
              Append[OptionValue[
                "Roots"], (Factor /@ CoefficientList[xx, var]) -> 
                jj]];
-           Sum[dlog[var - jj[[i]]], {i, deg}]]], 
+           Total@Array[dlog[var - jj[[#]]]&, deg]]], 
          With[{jj = 
             Factor /@ CoefficientList[xx, var] /. 
              OptionValue["Roots"]}, 
-          Sum[dlog[var - jj[[i]]], {i, deg}]]]]]]]
+          Total@Array[dlog[var - jj[[#]]]&, deg]]]]]]]
 
 dlogfactor2[exp_, var_, opts : OptionsPattern[]] := 
    With[{hh = exp /. dlog[xx_] :> 
@@ -554,10 +554,10 @@ preMoveVar[G[y_, z_], var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
            var, opts] + 
          dlogfactor[dlog[z - First[y]], var] preMoveVar[G[Rest[y], z],
             var, opts] + 
-         Sum[dlogfactor[dlog[y[[i]] - y[[i + 1]]], 
-            var] (preMoveVar[G[Delete[y, i + 1], z], var, opts] - 
-             preMoveVar[G[Delete[y, i], z], var, opts]), {i, 1, 
-           Length[y] - 1}]] /. 
+         Total@Array[dlogfactor[dlog[y[[#]] - y[[# + 1]]], 
+            var] (preMoveVar[G[Delete[y, # + 1], z], var, opts] - 
+             preMoveVar[G[Delete[y, #], z], var, opts]) &, 
+           Length[y] - 1]] /. 
        dlog[x_] G[s1_, var] :> G[Prepend[s1, -x /. var -> 0], var] /. 
       dlog[x_] :> G[{-x /. var -> 0}, var]] /. {G[_, 0] :> 0, 
     G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
@@ -676,8 +676,8 @@ newgint[inv[var_, x_, deg_], G[y_, var_], var_] :=
       ngint[inv[var, x, deg], G[Rest[y], var], var],
      1/(var - x)^(deg - 1) G[y, var] - 
       1/(First[y] - x)^(deg - 1) G[y, var] + 
-      Sum[1/(First[y] - x)^(k) ngint[inv[var, x, deg - k], 
-         G[Rest[y], var], var], {k, deg - 1}]]]]
+      Total@Array[1/(First[y] - x)^(#) ngint[inv[var, x, deg - #], 
+         G[Rest[y], var], var] &, deg - 1]]]]
 
 (* TODO: need a function to apart rational functions *)
 
