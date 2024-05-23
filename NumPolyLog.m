@@ -38,7 +38,7 @@ tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
 tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
 expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
-ExpandTensor[exp_]:=With[{hh=Dispatch[(#1->Factor[#1]&)/@GetAlphabet[exp]]},expandTensor[exp/.aa_Tensor:>Replace[aa,hh,1]/. Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]]
+ExpandTensor[exp_]:=With[{hh=Dispatch[DeleteCases[(#1->Factor[#1]&)/@GetAlphabet[exp],Rule[xx_,xx_]]]},expandTensor[exp/. aa_Tensor:>Replace[aa,hh,1]/. Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]]
 
 Options[dlogfactor] = {"FactorRoot" -> False, "Roots" -> {}};
 GetRoots[] := 
