@@ -194,6 +194,7 @@ GetWeight[
     Head[a] =!= Log && Head[a] =!= PolyLog && Head[a] =!= Zeta && 
     a =!= Power && a =!= Plus && a =!= List && a =!= Pi) := 0
 TakeWeight[k_][exp_] := Select[Expand[exp], GetWeight[#] === k &]
+TakeWeight[k_List][exp_] := Select[Expand[exp], MemberQ[k,GetWeight[#]] &]
 
 (* 
 extendedG is the extended G function introduced in the section 5.3 of 0410259 :
@@ -226,8 +227,10 @@ extendedG[y1_,b_,z_,y2_,w_]/;(w!=0&&w!=Length[z]):=(extendedG[y1,b,z,y2,w]=If[w=
 (* goodG, G functions which can be evaluated by series expansion, assuming dG[1]=log[0]->0 *)
 goodG[z_,y_]:=If[y===0,0,goodG[z/y]];
 (*goodG[z_,1]:=With[{kk=headone[z],len=Length[z]},If[len==1,dG[1],1/kk (dG[1]goodG[Rest[z],1]-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]],1],{m,kk+1,len}])]]/;First[z]===1;*)
-goodG[z_]/;(First[z]===1):=With[{kk=headone[z],len=Length[z]},If[len==1,0,1/kk (-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]]],{m,kk+1,len}])]];
-goodG[z_]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-PolyLog[Length[z],1/Last[z]];
+goodG[z_List]/;(First[z]===1):=With[{kk=headone[z],len=Length[z]},If[len==1,0,1/kk (-Sum[goodG[Join[ConstantArray[1,kk-1],z[[kk+1;;m]],{1},z[[m+1;;]]]],{m,kk+1,len}])]];
+goodG[z_List]/;(MatchQ[Most[z],{0..}]&&Last[z]=!=0):=-PolyLog[Length[z],1/Last[z]];
+goodG[z_List]/;Length[z]===2:=-PolyLog[2,1/(1-z[[1]])]-PolyLog[2,1/z[[2]]]+PolyLog[2,(z[[1]]-z[[2]])/((-1+z[[1]]) z[[2]])];
+
 (* acc G, use Hölder convolution to accelerate convergence *)
 accG[{z_},prec_:50]:=Log[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
@@ -241,7 +244,7 @@ MPLG[{a_ /; a =!= 0}, b_] := Log[1 - b/a]
 MPLG[z_, y2_] /; MatchQ[z, {0 ..}] && (y2 =!= 0) := Log[y2]^Length[z]/Length[z]!;
 MPLG[z_, y2_] /; (MatchQ[Most[z],{0..}]&&Last[z]=!=0) := -PolyLog[Length[z],y2/Last[z]];
 MPLG[zzz_, y_ /; y =!= 0] /; AllTrue[Append[zzz, y], NumberQ] && AnyTrue[Append[zzz, y], InexactNumberQ] :=
- With[{prec = Precision[Append[zzz, y]], z = Rationalize[zzz,10^(-Precision[zzz])]}, 
+ With[{prec = Precision[Append[zzz, y]], z = Rationalize[zzz,10^(-Ceiling@N@Precision[zzz])]}, 
   If[Last[z] === 0, 
    Expand[With[{zz = Most[z]}, 
      With[{kk = tailzero[z], len = Length[z]}, 
@@ -437,6 +440,7 @@ normGvar0[z_, var_, opts : OptionsPattern[{"FitValue"->{}}]] :=
    AnyTrue[DeleteCases[z /. nonvarFitValue, 0], PossibleZeroQ[Limit[1/#, var -> 0]] &], 0, 
    PossibleZeroQ[Last[z]] || PossibleZeroQ[First[z] - 1], 
    regword[myword @@ z, {1}, {0}] /. myword[xx__] :> normGvar0[{xx}, var, opts], 
+   (* TODO: keep divergent part *)
    True, 
    With[{firstlimit = Together[First[z] /. nonvarFitValue] /. var -> 0, 
      lastlimit = Together[Last[z] /. nonvarFitValue] /. var -> 0}, 
