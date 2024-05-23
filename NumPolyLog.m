@@ -1,6 +1,7 @@
 (* ::Package:: *)
 
 (* basic functions*)
+AllCases[exp_,head_]:=Union[Cases[exp,head,Infinity]]
 shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
 robustMemberQ[list_,mem_]:=If[Head[mem]===List,MemberQ[list,mem],AnyTrue[list-mem,PossibleZeroQ]]
@@ -16,7 +17,7 @@ Shufflep[s1_,s2_]:=With[{p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]]
 minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]===0,-minideg[1/f,var],Chop@Limit[f,var->0]===0,minideg[f/var,var]+1,True,0]]
 deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
 CoeffsList[exp_,vars_]:=Normal[Prepend[Transpose@{vars,#[[2]]},{1,#[[1]]}]]&@CoefficientArrays[exp,vars]
-FastCollect[exp_,head_]:=DeleteCases[With[{tensors=Cases[1+exp,head,Infinity]//Union},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
+FastCollect[exp_,head_]:=DeleteCases[With[{tensors=AllCases[1+exp,head]},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
 poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
@@ -37,13 +38,14 @@ tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
 tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
 expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
-ExpandTensor[exp_]:=expandTensor[exp/.Dispatch[#->Factor[#]&/@GetAlphabet[exp]]/.Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]
+ExpandTensor[exp_]:=With[{hh=Dispatch[(#1->Factor[#1]&)/@GetAlphabet[exp]]},expandTensor[exp/.aa_Tensor:>Replace[aa,hh,1]/. Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]]
 
 Options[dlogfactor] = {"FactorRoot" -> False, "Roots" -> {}};
-GetRoots[] := With[{hh = Options[dlogfactor, "Roots"][[1, 2]]},
+GetRoots[] := 
+ With[{hh = Options[dlogfactor, "Roots"][[1, 2]]}, 
   If[hh === {}, {}, 
-   Flatten[Table[#[[2, i]] -> root[#[[1, 1]], #[[1, 2]], i], {i, 
-        Length[#[[2]]]}] & /@ hh]]]
+   Flatten[(Table[#1[[2, i]] -> root[#1[[1]], i], {i, 
+         Length[#1[[2]]]}] &) /@ hh]]]
 
 dlogfactor[dlog[xx_]] := 
  dlogfactor[dlog[xx]] = 
@@ -486,31 +488,40 @@ of polynomials like x^2-root$12123, but root$12123 can also depend on x.
 *)
 dlogfactor[exp_, var_, opts : OptionsPattern[]] := 
  dlogfactor[exp, var, opts] = 
-   With[{hh = exp /. dlog[xx_] :> 
-                 Total[#[[2]] dlog[#[[1]]] & /@ FactorList[xx]] /. 
-             dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
-           dlog[xx_ /; PolynomialQ[xx, var]] :> 
-       dlog[Collect[xx/Coefficient[xx, var^Exponent[xx, var]], var]]}, 
-     If[! OptionValue["FactorRoot"], With[{jj = 
-            Select[(Union@Cases[1 + hh, _dlog, Infinity] /. 
-                  dlog -> Identity), ! (PolynomialQ[#, var] && 
-                      Exponent[#, var] === 1) &]}, 
-        If[Length[jj] > 0, 
-      Message[MoveVar::notlinearred, First[jj]]; 
-          Abort[]; hh, hh]],
-    hh /. 
-     dlog[xx_ /; PolynomialQ[xx, var]] :> 
-      With[{deg = Exponent[xx, var]},
-       If[deg === 1, dlog[xx],
-        If[! MemberQ[First /@ OptionValue["Roots"], {xx, var}],
-         With[{jj = Table[Unique[root], {i, deg}]},
-          SetOptions[dlogfactor, 
-           "Roots" -> Append[OptionValue["Roots"], {xx, var} -> jj]];
-          Sum[dlog[var - jj[[i]]], {i, deg}]],
-         With[{jj = {xx, var} /. OptionValue["Roots"]},
-          Sum[dlog[var - jj[[i]]], {i, deg}]]
-         ]]
-       ]]]
+  With[{hh = 
+     exp /. dlog[xx_] :> 
+         Total[#[[2]]  dlog[#[[1]]] & /@ FactorList[xx]] /. 
+       dlog[xx_] :> 0 /; FreeQ[xx, var] /. 
+      dlog[xx_ /; PolynomialQ[xx, var]] :> 
+       dlog[Collect[xx/Coefficient[xx, var^Exponent[xx, var]], var]]},
+    If[! OptionValue["FactorRoot"], 
+    With[{jj = 
+       Select[(AllCases[1 + hh, _dlog] /. 
+          dlog -> Identity), ! (PolynomialQ[#, var] && 
+            Exponent[#, var] === 1) &]}, 
+     If[Length[jj] > 0, Message[MoveVar::notlinearred, First[jj]];
+      Abort[]; hh, hh]], 
+    hh /. dlog[xx_ /; PolynomialQ[xx, var]] :> 
+      With[{deg = Exponent[xx, var]}, 
+       If[deg === 1, dlog[xx], 
+        If[! MemberQ[First /@ OptionValue["Roots"], 
+           Factor /@ CoefficientList[xx, var]],
+         With[{kk = 
+            If[Length@OptionValue["Roots"] === 0, 1, 
+             1 + Max@Union@
+                Cases[OptionValue["Roots"], root[a_, _] :> a, 
+                 Infinity]]},
+          With[{jj = Table[root[kk, i], {i, deg}]}, 
+           SetOptions[dlogfactor, 
+            "Roots" -> 
+             Append[OptionValue[
+               "Roots"], (Factor /@ CoefficientList[xx, var]) -> 
+               jj]];
+           Sum[dlog[var - jj[[i]]], {i, deg}]]], 
+         With[{jj = 
+            Factor /@ CoefficientList[xx, var] /. 
+             OptionValue["Roots"]}, 
+          Sum[dlog[var - jj[[i]]], {i, deg}]]]]]]]
 
 dlogfactor2[exp_, var_, opts : OptionsPattern[]] := 
    With[{hh = exp /. dlog[xx_] :> 
@@ -560,7 +571,7 @@ MoveVar[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
    0, (x /. {G[y_, z_] :> NormGVar0[y, z, var, opts]}) + 
    With[{hh = totalD[x] /. dlog[y_] :> dlogfactor[dlog[y], var] /. _totalD :> 0}, 
     If[hh === 0, 0, 
-     With[{dlogs = Union[Cases[1 + hh, _dlog, Infinity]]}, 
+     With[{dlogs = AllCases[1 + hh, _dlog]}, 
        Expand[(MoveVar[#, var, opts] & /@ 
              Normal@Last@CoefficientArrays[hh, dlogs]) . dlogs] /. 
          dlog[xx_] G[s1_, var] :> 
@@ -602,7 +613,7 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
          dlog[xx_ /; PolynomialQ[xx, var]] :> 
           dlog[xx/Coefficient[xx, var^Exponent[xx, var]]])]}, 
    With[{jj = 
-      Select[(Union@Cases[1 + hh, _dlog, Infinity] /. 
+      Select[(AllCases[1 + hh, _dlog] /. 
          dlog -> Identity), ! (PolynomialQ[#, var] && 
            Exponent[#, var] === 1) &]}, 
     If[Length[jj] > 0, Message[GIntegrate::notlinearred, First[jj]];
@@ -669,11 +680,9 @@ UpliftSymbol[exp_, vars_] :=
     With[{jj = 
        GIntegrate[
         If[Head[#] === Plus, 
-           First[Union[
-                Cases[#, _dlog, Infinity]]] UpliftSymbol[# /. _dlog :>
+           First[AllCases[#, _dlog]] UpliftSymbol[# /. _dlog :>
                   1, vars] & /@ #, 
-           First[Union[
-              Cases[#, _dlog, Infinity]]] UpliftSymbol[# /. _dlog :> 
+           First[AllCases[#, _dlog]] UpliftSymbol[# /. _dlog :> 
                1, vars]] &@
          Collect[exp /. Tensor[x___, y_] :> Tensor[x] dlog[y] /. 
            dlog[x_] :> 0 /; FreeQ[x, First[hh]], _dlog], First[hh]]},
