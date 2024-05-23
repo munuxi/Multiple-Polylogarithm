@@ -1,7 +1,7 @@
 (* ::Package:: *)
 
 (* basic functions*)
-AllCases[exp_,head_]:=Union[Cases[exp,head,Infinity]]
+AllCases[exp_,head_]:=Union[Cases[exp,head,All]]
 shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
 longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
 robustMemberQ[list_,mem_]:=If[Head[mem]===List,MemberQ[list,mem],AnyTrue[list-mem,PossibleZeroQ]]
@@ -17,7 +17,7 @@ Shufflep[s1_,s2_]:=With[{p=Transpose[Rest@Permutations[Join[(1&)/@s1,(0&)/@s2]]]
 minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]===0,-minideg[1/f,var],Chop@Limit[f,var->0]===0,minideg[f/var,var]+1,True,0]]
 deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
 CoeffsList[exp_,vars_]:=Normal[Prepend[Transpose@{vars,#[[2]]},{1,#[[1]]}]]&@CoefficientArrays[exp,vars]
-FastCollect[exp_,head_]:=DeleteCases[With[{tensors=AllCases[1+exp,head]},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
+FastCollect[exp_,head_]:=DeleteCases[With[{tensors=AllCases[exp,head]},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
 poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
@@ -32,13 +32,23 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 
 (*some symbol calculation*)
 
-GetAlphabet[x_]:=Cases[1+x,Tensor[y__]:>y,Infinity]//Union
+GetAlphabet[x_]:=Cases[x,Tensor[y__]:>y,All]//Union
 tensor[___,1|-1,___]:=0
 tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
 tensor[x___,y_,w___]/;y=!=0&&y===First@Sort[{-y,y}]:=tensor[x,-y,w]
 expandTensor[exp_]:=Expand[exp/.Tensor->tensor,_tensor]/.tensor->Tensor
 ExpandTensor[exp_]:=With[{hh=Dispatch[DeleteCases[(#1->Factor[#1]&)/@GetAlphabet[exp],Rule[xx_,xx_]]]},expandTensor[exp/. aa_Tensor:>Replace[aa,hh,1]/. Tensor[x___]:>Distribute[Tensor[x],Times,Tensor,Plus]]]
+
+GetkthEntries[k_List][s_] := GetkthEntries[#][s] & /@ k
+GetkthEntries[k_][s_] /; Element[k, Integers] := 
+ Which[k === 0, {}, k > 0, 
+  Union[Cases[s, 
+    Tensor[Sequence @@ ConstantArray[_, k - 1], y_, ___] :> y, 
+    All]], k < 0, 
+  Union[Cases[s, 
+    Tensor[___, y_, Sequence @@ ConstantArray[_, -k - 1]] :> y, 
+    All]]]
 
 Options[dlogfactor] = {"FactorRoot" -> False, "Roots" -> {}};
 GetRoots[] := 
@@ -134,7 +144,7 @@ removetailzero[anyG[z_, y_]] :=
 
 GtoSymbol[exp_] := 
  With[{maxlen = 
-    Max[Length /@ Union@Cases[1 + exp, G[x_, _] :> x, Infinity]]}, 
+    Max[Length /@ Union@Cases[exp, G[x_, _] :> x, All]]}, 
   If[maxlen > First@$tosymbolGstored, 
    $tosymbolGstored = {maxlen, 
      Join[Last@$tosymbolGstored, 
@@ -496,7 +506,7 @@ dlogfactor[exp_, var_, opts : OptionsPattern[]] :=
        dlog[Collect[xx/Coefficient[xx, var^Exponent[xx, var]], var]]},
     If[! OptionValue["FactorRoot"], 
     With[{jj = 
-       Select[(AllCases[1 + hh, _dlog] /. 
+       Select[(AllCases[hh, _dlog] /. 
           dlog -> Identity), ! (PolynomialQ[#, var] && 
             Exponent[#, var] === 1) &]}, 
      If[Length[jj] > 0, Message[MoveVar::notlinearred, First[jj]];
@@ -510,7 +520,7 @@ dlogfactor[exp_, var_, opts : OptionsPattern[]] :=
             If[Length@OptionValue["Roots"] === 0, 1, 
              1 + Max@Union@
                 Cases[OptionValue["Roots"], root[a_, _] :> a, 
-                 Infinity]]},
+                 All]]},
           With[{jj = Table[root[kk, i], {i, deg}]}, 
            SetOptions[dlogfactor, 
             "Roots" -> 
@@ -571,7 +581,7 @@ MoveVar[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
    0, (x /. {G[y_, z_] :> NormGVar0[y, z, var, opts]}) + 
    With[{hh = totalD[x] /. dlog[y_] :> dlogfactor[dlog[y], var] /. _totalD :> 0}, 
     If[hh === 0, 0, 
-     With[{dlogs = AllCases[1 + hh, _dlog]}, 
+     With[{dlogs = AllCases[hh, _dlog]}, 
        Expand[(MoveVar[#, var, opts] & /@ 
              Normal@Last@CoefficientArrays[hh, dlogs]) . dlogs] /. 
          dlog[xx_] G[s1_, var] :> 
@@ -613,7 +623,7 @@ preGIntegrate[dlog[x_] G[y_, var_], var_] :=
          dlog[xx_ /; PolynomialQ[xx, var]] :> 
           dlog[xx/Coefficient[xx, var^Exponent[xx, var]]])]}, 
    With[{jj = 
-      Select[(AllCases[1 + hh, _dlog] /. 
+      Select[(AllCases[hh, _dlog] /. 
          dlog -> Identity), ! (PolynomialQ[#, var] && 
            Exponent[#, var] === 1) &]}, 
     If[Length[jj] > 0, Message[GIntegrate::notlinearred, First[jj]];
@@ -671,7 +681,7 @@ newgint[inv[var_, x_, deg_], G[y_, var_], var_] :=
 UpliftSymbol[exp_, vars_] := 
  With[{hh = Select[vars, MemberQ[Variables[GetAlphabet[exp]], #] &], 
    weights = 
-    Union@Cases[1 + exp, Tensor[x___] :> Length[{x}], Infinity]},
+    Union@Cases[exp, Tensor[x___] :> Length[{x}], All]},
   Which[
     hh === {}, exp,
     Length[weights] =!= 1, Print["not unit weight"]; Abort[],
