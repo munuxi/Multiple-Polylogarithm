@@ -243,18 +243,21 @@ MPLG[{0 ..}, 0] := ComplexInfinity
 MPLG[{a_ /; a =!= 0}, b_] := Log[1 - b/a]
 MPLG[z_, y2_] /; MatchQ[z, {0 ..}] && (y2 =!= 0) := Log[y2]^Length[z]/Length[z]!;
 MPLG[z_, y2_] /; (MatchQ[Most[z],{0..}]&&Last[z]=!=0) := -PolyLog[Length[z],y2/Last[z]];
-MPLG[zzz_, y_ /; y =!= 0] /; AllTrue[Append[zzz, y], NumberQ] && AnyTrue[Append[zzz, y], InexactNumberQ] :=
- With[{prec = Precision[Append[zzz, y]], z = Rationalize[zzz,10^(-Ceiling@N@Precision[zzz])]}, 
-  If[Last[z] === 0, 
+MPLG[zzz_, y_ /; y =!= 0] /; 
+  AllTrue[Append[zzz, y], NumberQ] && 
+   AnyTrue[Append[zzz, y], InexactNumberQ] := 
+ With[{prec = Ceiling@N@Precision[Append[zzz, y]], z = zzz, 
+   zy = zzz/y}, 
+  If[PossibleZeroQ[Last[z]], 
    Expand[With[{zz = Most[z]}, 
      With[{kk = tailzero[z], len = Length[z]}, 
-      1/kk (If[y === 1, 0, Log[y] MPLG[zz, y]] - 
-         Total@Array[MPLG[
-           Join[z[[1 ;; # - 1]], {0}, 
-            z[[# ;; len - kk - 1]], {z[[len - kk]]}, 
-            ConstantArray[0, kk - 1]], y]&, len - kk])]]], 
-   N[If[Rationalize[First[z]/y, 0] === 1, ComplexInfinity, 
-     extendedG[0, {}, Rationalize[z/y, 0], 1, 0] /. 
+      1/kk   (If[y === 1, 0, Log[y]   MPLG[zz, y]] - 
+         Total@Array[
+           MPLG[Join[z[[1 ;; # - 1]], {0}, 
+              z[[# ;; len - kk - 1]], {z[[len - kk]]}, 
+              ConstantArray[0, kk - 1]], y] &, len - kk])]]], 
+   N[If[Rationalize[zy, 10^(-prec - 5)] === 1, ComplexInfinity, 
+     extendedG[0, {}, Rationalize[zy, 10^(-prec - 5)], 1, 0] /. 
        goodG[x_] :> goodG[Rationalize[x, 0]] //. {goodG[x_] :> 
         accG[x, prec]}], prec]]]
 numLi[m_, x_, prec_ : 50] := N[(-1)^Length[m] MPLG[longhand[m, Rest[FoldList[#1/#2 &, 1, x]]], 1], prec]
