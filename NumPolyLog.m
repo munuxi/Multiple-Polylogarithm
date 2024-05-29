@@ -256,7 +256,7 @@ MPLG[zzz_, y_ /; y =!= 0] /;
            MPLG[Join[z[[1 ;; # - 1]], {0}, 
               z[[# ;; len - kk - 1]], {z[[len - kk]]}, 
               ConstantArray[0, kk - 1]], y] &, len - kk])]]], 
-   N[If[Rationalize[zy, 10^(-prec - 5)] === 1, ComplexInfinity, 
+   N[If[Rationalize[First@zy, 10^(-prec - 5)] === 1, ComplexInfinity, 
      extendedG[0, {}, Rationalize[zy, 10^(-prec - 5)], 1, 0] /. 
        goodG[x_] :> goodG[Rationalize[x, 0]] //. {goodG[x_] :> 
         accG[x, prec]}], prec]]]
