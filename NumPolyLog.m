@@ -646,12 +646,17 @@ combGvar[x_, var_] :=
        G[xx, var]^(k - 2) Total[G[#, var] & /@ Shuffle[xx, xx]]}] &, 
   x]
 
-GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
+(* GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
  With[{hh = 
     Expand[combGvar[
       Total[#[[1]] MoveVar[#[[2]], var, opts] & /@ 
         FastCollect[x, _dlog]], var]]}, 
   If[Head[hh] === Plus, preGIntegrate[#, var] & /@ hh, 
+   preGIntegrate[hh, var]]] *)
+
+GIntegrate[x_, var_, opts : OptionsPattern[{"FitValue" -> {}}]] := 
+ With[{hh = Expand[combGvar[MoveVar[x, var, opts], var]]}, 
+  If[Head[hh] === Plus, (preGIntegrate[#1, var] &) /@ hh, 
    preGIntegrate[hh, var]]]
 
 (* the integral is assumed to be converged *)
