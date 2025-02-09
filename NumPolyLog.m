@@ -234,7 +234,15 @@ goodG[z_List]/;Length[z]===2:=-PolyLog[2,1/(1-z[[1]])]-PolyLog[2,1/z[[2]]]+PolyL
 (* acc G, use Hölder convolution to accelerate convergence *)
 accG[{z_},prec_:50]:=Log[(-1+z)/z];
 accG[{z1_,z2_},prec_:50]:=-PolyLog[2,1/(1-z1)]-PolyLog[2,1/z2]+PolyLog[2,(z1-z2)/((-1+z1) z2)];
-accG[hh_,prec_:50]:=accG[hh,prec]=With[{z=Rationalize[hh,0]},If[AnyTrue[DeleteCases[z,0],Abs[#]<=1.05&],accG[2z,prec]+(-1)^Length[z]accG[2(1-Reverse[z]),prec]+Total@Array[(-1)^# accG[2(1-Reverse[z[[1;;#]]]),prec]accG[2z[[#+1;;]],prec] &,Length[z]-1],poorNG[z,1,prec]]];
+accG[hh_, prec_ : 50] := 
+ accG[hh, prec] = 
+  With[{z = Rationalize[hh, 0]}, 
+   If[AnyTrue[DeleteCases[z, 0], Abs[#] <= 1.05 &], 
+    accG[2 z, prec] + (-1)^Length[z] accG[2 (1 - Reverse[z]), prec] + 
+     Total@Array[(-1)^# accG[2 (1 - Reverse[z[[1 ;; #]]]), prec] accG[
+          2 z[[# + 1 ;;]], prec] &, Length[z] - 1], 
+    If[AllTrue[DeleteCases[z, 0], Abs[#] > 1 &], poorNG[z, 1, prec], 
+     extendedG[0, {}, Rationalize[z, 10^(-prec - 5)], 1, 0]]]]
 (* define MPLG *)
 SetAttributes[MPLG, NumericFunction]
 MPLG[{}, _]  := 1
