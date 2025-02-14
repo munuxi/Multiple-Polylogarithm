@@ -1,9 +1,38 @@
 (* ::Package:: *)
 
+BeginPackage["NumPolyLog`"];
+
+AllCases::usage = "AllCases[exp,head] gives all the subexpressions of exp with head head.";
+Shuffle::usage = "Shuffle[s1,s2] gives the shuffle product of s1 and s2.";
+Shufflep::usage = "Shufflep[s1,s2] gives the shuffle product of s1 and s2 without the first term.";
+GetAlphabet::usage = "GetAlphabet[x] gives the alphabet of x.";
+GetkthEntries::usage = "GetkthEntries[k][s] gives the k-th entries of s.";
+EnableFactorRoot::usage = "EnableFactorRoot[] enables the factorization of the roots in the G function.";
+DisableFactorRoot::usage = "DisableFactorRoot[] disables the factorization of the roots in the G function.";
+GetRoots::usage = "GetRoots[] gives the roots used for G functions.";
+ClearRoots::usage = "ClearRoots[] clears the roots used for G functions.";
+HPLToG::usage = "HPLToG[exp] converts HPL to G functions.";
+PolyLogToG::usage = "PolyLogToG[exp] converts PolyLog to G functions.";
+GIntegrate::usage = "GIntegrate[exp, var] integrates the G function with respect to var.";
+MoveVar::usage = "MoveVar[exp, var] moves the var to the first position of the G function.";
+ChernMoveVar::usage = "ChernMoveVar[exp, var] moves the var to the first position of the G function.";
+ToSymbol::usage = "ToSymbol[exp] converts the expression to the symbol form.";
+SymbolMap::usage = "SymbolMap[exp] converts the expression to the symbol form.";
+GetWeight::usage = "GetWeight[a] gives the weight of a.";
+TakeWeight::usage = "TakeWeight[k][exp] gives the terms with weight k in exp.";
+UpliftSymbol::usage = "UpliftSymbol[exp] uplifts the symbol to the G function.";
+FastCollect::usage = "FastCollect[exp, head] collects the terms with head.";
+MPLG::usage = "MPLG[z, y] gives the multiple polylogarithm.";
+numMZV::usage = "numMZV[m] gives the numerical value of the multiple zeta value.";
+numLi::usage = "numLi[m, x] gives the numerical value of the multiple polylogarithm.";
+
+Begin["`Private`"];
+
 (* basic functions*)
 AllCases[exp_,head_]:=Union[Cases[exp,head,All]]
 shorthand[vec_]:=Module[{nowm=1,mlist={}},Do[If[mem===0,nowm++;,AppendTo[mlist,nowm];nowm=1;],{mem,vec}];If[nowm==1,{mlist,#},{Append[mlist,nowm],#}]&@DeleteCases[vec,0]]
-longhand[v_,w_]:=Join@@(Append[ConstantArray[0,First[#]],Last[#]]&/@Transpose[{v-1,w}])
+shorthand[vec_]:=With[{hh=SparseArray[vec]},{Differences@Prepend[Flatten[hh["ColumnIndices"]],0],hh["ExplicitValues"]}]
+longhand[v_,w_]:=With[{av=Accumulate[v]},Normal@SparseArray[Thread[Rule[av,w]],Last@av]]
 RobustMemberQ[list_,mem_]:=If[Head[mem]===List,MemberQ[list,mem],AnyTrue[list-mem,PossibleZeroQ]]
 readfirstnotinpos[list_,sublist_,direction_]:=Which[direction===1,If[Length[list]>0&&RobustMemberQ[sublist,First[list]],readfirstnotinpos[Rest[list],sublist,direction]+1,0],direction===-1,If[Length[list]>0&&RobustMemberQ[sublist,Last[list]],readfirstnotinpos[Most[list],sublist,direction]+1,0],True,0]
 tailzero[list_]:=readfirstnotinpos[list,{0},-1]
@@ -18,7 +47,7 @@ minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]=
 deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
 CoeffsList[exp_,vars_]:=Normal[Prepend[Transpose@{vars,#[[2]]},{1,#[[1]]}]]&@CoefficientArrays[exp,vars]
 FastCollect[exp_,head_]:=DeleteCases[With[{tensors=AllCases[exp,head]},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
-poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Max[250,1.25 * prec/Log[10,Abs[Min[Abs[prezz]]/preyy]]],len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
+poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Ceiling@With[{numK=Count[mm,1],lambda=1-Max[Abs[preyy/prezz]]},(Log[lambda]-prec Log[10]-numK Log[2]-If[numK===0,0,numK Log[numK]]+numK)/Log[1-lambda]]+10,len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
 poorNG[z_List,y_,prec_:50]:=poorNG[z,y,prec]=With[{hh=Chop[z]},If[AnyTrue[DeleteCases[hh,0],Abs[y/#]>1&],0,poorNG[Sequence@@(shorthand[hh]),y,prec]]]
@@ -32,7 +61,7 @@ levinsum[mm_,prezz_,preyy_,prec_]:=N[With[{zz=N[Rationalize[prezz,0],5prec],yy=N
 
 (*some symbol calculation*)
 
-GetAlphabet[x_]:=Cases[x,Tensor[y__]:>y,All]//Union
+GetAlphabet[x_]:=AllCases[x,Tensor[y__]:>y]
 tensor[___,1|-1,___]:=0
 tensor[x___,1/y_,w___]:=-tensor[x,y,w]
 tensor[x___,y_^a_Integer,w___]:=a tensor[x,y,w]
@@ -51,11 +80,6 @@ GetkthEntries[k_][s_] /; Element[k, Integers] :=
     All]]]
 
 Options[dlogfactor] = {"FactorRoot" -> False, "Roots" -> {}};
-GetRoots[] := 
- With[{hh = Options[dlogfactor, "Roots"][[1, 2]]}, 
-  If[hh === {}, {}, 
-   Flatten[(Table[#1[[2, i]] -> root[#1[[1]], i], {i, 
-         Length[#1[[2]]]}] &) /@ hh]]]
 
 dlogfactor[dlog[xx_]] := 
  dlogfactor[dlog[xx]] = 
@@ -573,6 +597,16 @@ preMoveVar[G[y_, z_], var_, opts : OptionsPattern[{"FitValue" -> {}}]] :=
       dlog[x_] :> G[{-x /. var -> 0}, var]] /. {G[_, 0] :> 0, 
     G[{0 ..}, 1] :> 0, G[{1/2}, 1] -> I Pi}
 
+EnableFactorRoot[] := (SetOptions[dlogfactor, "FactorRoot" -> True];)
+DisableFactorRoot[] := (SetOptions[dlogfactor, "FactorRoot" -> False];)
+GetRoots[] := 
+ With[{hh = Options[dlogfactor, "Roots"][[1, 2]]}, 
+  If[hh === {}, {}, 
+   Flatten[(Table[#1[[2, i]] -> root[#1[[1]], i], {i, 
+         Length[#1[[2]]]}] &) /@ hh]]]
+ClearRoots[] := (DownValues[dlogfactor] = DownValues[dlogfactor][[-5 ;;]];
+   SetOptions[dlogfactor, "Roots" -> {}];)
+
 (*
 revbranch[G[x_, var_], FitValue_ : {}] := 
  With[{revbranchx = 
@@ -713,3 +747,6 @@ UpliftSymbol[exp_, vars_] :=
            dlog[x_] :> 0 /; FreeQ[x, First[hh]], _dlog], First[hh]]},
      jj + UpliftSymbol[Expand[ExpandTensor[exp - SymbolMap[jj]]], vars]]] /. 
    Pi -> 0]
+
+End[];
+EndPackage[];
