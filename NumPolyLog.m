@@ -25,6 +25,9 @@ FastCollect::usage = "FastCollect[exp, head] collects the terms with head.";
 MPLG::usage = "MPLG[z, y] gives the multiple polylogarithm.";
 numMZV::usage = "numMZV[m] gives the numerical value of the multiple zeta value.";
 numLi::usage = "numLi[m, x] gives the numerical value of the multiple polylogarithm.";
+Tensor::usage = "head of symbol.";
+G::usage = "multiple polylogarithm.";
+dlog::usage = "dlog[x] is the logarithmic derivative of x.";
 
 Begin["`Private`"];
 
