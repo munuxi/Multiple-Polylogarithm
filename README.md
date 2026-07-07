@@ -1,6 +1,17 @@
 # Multiple Polylogarithm
 Numerical Multiple Polylogarithm (or Generalized Polylogarithm, Goncharov Polylogarithm) in Mathematica
 
+## Why we still need this package after Wolfram 15.0
+
+Please try
+```Mathematica
+AbsoluteTiming[N[GeneralizedPolyLog[{1, 2, 3}, 4], 50]]
+```
+and after importing this package 
+```Mathematica
+AbsoluteTiming[N[MPLG[{1, 2, 3}, 4], 200]]
+```
+
 ## License
 
 [The MIT License (MIT)](https://raw.githubusercontent.com/munuxi/Generalized-Polylogarithm/master/LICENSE)
