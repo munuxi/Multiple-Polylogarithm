@@ -50,7 +50,54 @@ minideg[f_,var_]:=minideg[f,var]=If[FreeQ[f,var],0,Which[Chop@Limit[1/f,var->0]=
 deglead[f_,var_]:=With[{hh=minideg[f,var]},{hh,SeriesCoefficient[f,{var,0,hh}]}]
 CoeffsList[exp_,vars_]:=Normal[Prepend[Transpose@{vars,#[[2]]},{1,#[[1]]}]]&@CoefficientArrays[exp,vars]
 FastCollect[exp_,head_]:=DeleteCases[With[{tensors=AllCases[exp,head]},If[tensors==={},{{1,exp}},CoeffsList[exp,tensors]]],{_,0}]
-poorsum[mm_,prezz_,preyy_,prec_]:=With[{zz=N[Rationalize[prezz,0],2prec],yy=N[Rationalize[preyy,0],2prec],bound=Ceiling@With[{numK=Count[mm,1],lambda=1-Max[Abs[preyy/prezz]]},(Log[lambda]-prec Log[10]-numK Log[2]-If[numK===0,0,numK Log[numK]]+numK)/Log[1-lambda]]+10,len=Length[mm]},(-1)^len Last@Fold[Accumulate[#1(Table[(If[#2===1,yy,zz[[#2-1]]]/zz[[#2]])^(j+len-#2)(j+len-#2)^(-mm[[#2]]),{j,bound}])]&,1,Range[Length[mm],1,-1]]]
+(* At n = cutoff + 1 the tail is at most q^n M(1 + Log[n]) /
+   ((1 - q) n^m1), where M(h) = Max[h^j/j!, 0 <= j < depth].
+   Bound Log[n] by k (7/10) + (x - 1/x)/2 for n = 2^k x, 1 <= x < 2. *)
+seriesTailFactor[n_Integer, mm_List] := Module[{k, x, h, j},
+  k = IntegerLength[n, 2] - 1;
+  x = n/2^k;
+  h = 1 + 7 k/10 + (x - 1/x)/2;
+  j = Min[Length[mm] - 1, Floor[h]];
+  h^j/(j! n^First[mm])
+]
+
+seriesCutoff[q2_, mm_List, prec_] := Module[
+  {budget = 10^(-prec - 2), lo = Length[mm] - 1, hi = Length[mm], mid,
+   logQ, logScale, estimate, within, n, scale, upper},
+  logQ = N[Log[q2]/2, 25];
+  logScale = N[Log[2/((1 - q2) budget)], 25] + 1/2;
+  estimate[cutoff_] :=
+    (cutoff + 1) logQ + logScale + N[Log[seriesTailFactor[cutoff + 1, mm]], 25];
+  While[estimate[hi] > 0, lo = hi; hi *= 2];
+  While[hi - lo > 1,
+    mid = Quotient[lo + hi, 2];
+    If[estimate[mid] > 0, lo = mid, hi = mid]
+  ];
+  (* Verify the estimate with rational arithmetic. Rounding q^2 up by a
+     relative 1/n costs at most 1/2 in the log tail. Also 1/(1-q) <= 2/(1-q^2). *)
+  within[cutoff_] := (
+    n = cutoff + 1;
+    scale = 2^IntegerLength[Ceiling[n/q2], 2];
+    upper = Ceiling[scale q2]/scale;
+    upper^n (2 seriesTailFactor[n, mm])^2 <= ((1 - q2) budget)^2
+  );
+  While[!within[hi], hi *= 2];
+  hi
+]
+
+poorsum[mm_, prezz_, preyy_, prec_] := Module[
+  {z = Rationalize[prezz, 0], y = Rationalize[preyy, 0], q2, len = Length[mm], count},
+  If[y === 0, Return[0]];
+  q2 = Max[Abs[y/z]^2];
+  If[!TrueQ[0 < q2 < 1], Return[$Failed]];
+  (* The outermost table starts at n = len. *)
+  count = seriesCutoff[q2, mm, prec] - len + 1;
+  z = N[z, 2 prec];
+  y = N[y, 2 prec];
+  (-1)^len Last@Fold[
+    Accumulate[#1 Table[(If[#2 === 1, y, z[[#2 - 1]]]/z[[#2]])^(j + len - #2)
+      (j + len - #2)^(-mm[[#2]]), {j, count}]] &, 1, Range[len, 1, -1]]
+]
 poorNG[{mm_Integer},{zz_},y_,prec_:50]:=-PolyLog[mm,y/zz]
 poorNG[{mm__Integer},{zz__},y_,prec_:50]:=poorsum[{mm},{zz},y,prec]
 poorNG[z_List,y_,prec_:50]:=poorNG[z,y,prec]=With[{hh=Chop[z]},If[AnyTrue[DeleteCases[hh,0],Abs[y/#]>1&],0,poorNG[Sequence@@(shorthand[hh]),y,prec]]]

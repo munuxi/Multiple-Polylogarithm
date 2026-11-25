@@ -43,8 +43,6 @@ In[5]:= N[MPLG[{Pi, 0, 1, 0}, 1/2] - MPLG[{Pi, 0, 1, 0}, 1/3], 20]
 Out[5]= -0.079243361725535382729
 ```
 
-However, the determination of the bound of the series (according to a given precision) in this code is based on an empirical formula, and its correctness is not proven.
-
 A related function `numLi` can be used to calculate multiple Li functions Li_{a1,...,an}(z1,...,zn), for example 
 ```Mathematica
 In[6]:= numLi[{4,3},{10,-5}]
